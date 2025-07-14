@@ -243,3 +243,43 @@ class TestDecoratorIntegration:
                     return MockConfig()
 
                 # Missing: missing_in_config AND missing_in_module properties
+
+    def test_service_method_using_forwarded_properties(self):
+        """Test service method that uses multiple forwarded properties - matches README example."""
+
+        class DatabaseConfig:
+            host = "localhost"
+            port = 5432
+            timeout = 30
+
+        @law_of_demeter("_config")
+        class DatabaseService:
+            _config: DatabaseConfig
+            _host: str
+            _port: int
+            _timeout: int
+
+            def connect(self) -> str:
+                return f"Connected to {self._host}:{self._port} (timeout: {self._timeout}s)"
+
+        @module(CachingStrategy.NOT_THREAD_SAFE)
+        class AppModule:
+            config: DatabaseConfig
+            database: DatabaseService
+
+        # Test the complete integration
+        app = AppModule()
+        db_service = app.database
+
+        # Verify forwarded properties work
+        assert db_service._host == "localhost"
+        assert db_service._port == 5432
+        assert db_service._timeout == 30
+
+        # Verify method using forwarded properties works
+        connection_str = db_service.connect()
+        assert connection_str == "Connected to localhost:5432 (timeout: 30s)"
+
+        # Verify config injection works
+        assert isinstance(db_service._config, DatabaseConfig)
+        assert db_service._config.host == "localhost"

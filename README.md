@@ -26,7 +26,6 @@ pip install reactor-di
 ## Quick Start
 
 ```python
-from abc import ABC
 from reactor_di import module, law_of_demeter, CachingStrategy
 
 # Example: Database service with configuration forwarding
@@ -35,7 +34,8 @@ class DatabaseConfig:
     port = 5432
     timeout = 30
 
-class DatabaseService(ABC):
+@law_of_demeter("_config")
+class DatabaseService:
     _config: DatabaseConfig
     _host: str      # Forwarded from config.host
     _port: int      # Forwarded from config.port
@@ -44,16 +44,11 @@ class DatabaseService(ABC):
     def connect(self) -> str:
         return f"Connected to {self._host}:{self._port} (timeout: {self._timeout}s)"
 
-# Law of Demeter: Create forwarding properties for clean access
-@law_of_demeter("_config")
-class CleanDatabaseService(DatabaseService):
-    pass
-
 # Module: Automatic dependency injection with caching
 @module(CachingStrategy.NOT_THREAD_SAFE)
 class AppModule:
     config: DatabaseConfig      # Directly instantiated
-    database: CleanDatabaseService  # Synthesized with dependencies
+    database: DatabaseService   # Synthesized with dependencies
 
 # Usage
 app = AppModule()
