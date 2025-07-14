@@ -5,11 +5,10 @@ This package provides decorators based on the mediator and factory patterns
 for generating dependency injection code.
 """
 
+from importlib.metadata import version
 from typing import List
 
-__version__ = "0.1.0"
-__author__ = "Christian Schlichtherle"
-__email__ = ""
+__version__ = version("reactor-di")
 
 # Import main decorators when they are added
 # from .decorators import module, law_of_demeter
