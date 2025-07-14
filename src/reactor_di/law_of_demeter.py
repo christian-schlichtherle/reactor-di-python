@@ -46,10 +46,10 @@ from functools import wraps
 from typing import Any, Callable, Type, get_type_hints
 
 from .type_utils import (
-    is_type_compatible,
-    safe_get_type_hints,
     get_all_type_hints,
+    is_type_compatible,
     needs_implementation,
+    safe_get_type_hints,
 )
 
 
@@ -114,7 +114,9 @@ def _can_resolve_annotation(
     # Type compatibility check
     if has_annotation:
         target_member_type = target_annotations[target_attr_name]
-        if not is_type_compatible(target_member_type, source_type):
+        if not is_type_compatible(
+            provided_type=target_member_type, required_type=source_type
+        ):
             raise TypeError(
                 f"Cannot forward {base_ref}.{target_attr_name}: {target_member_type} "
                 f"to {cls.__name__}.{target_attr_name}: {source_type} - types incompatible"
@@ -136,9 +138,8 @@ def _should_handle_annotation(annotated_name: str, prefix: str) -> bool:
     if prefix == "":
         # Empty prefix: only handle public annotations (no underscore)
         return not annotated_name.startswith("_")
-    else:
-        # Non-empty prefix: handle annotations starting with this prefix
-        return annotated_name.startswith(prefix)
+    # Non-empty prefix: handle annotations starting with this prefix
+    return annotated_name.startswith(prefix)
 
 
 def law_of_demeter(

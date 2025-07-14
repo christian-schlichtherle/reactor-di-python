@@ -43,10 +43,10 @@ from typing import Any, Callable, Set, Union
 
 from .caching import CachingStrategy
 from .type_utils import (
-    is_type_compatible,
-    safe_get_type_hints,
     get_all_type_hints,
+    is_type_compatible,
     needs_implementation,
+    safe_get_type_hints,
 )
 
 
@@ -69,12 +69,7 @@ def _needs_synthesis(cls: Any) -> bool:
 
     # Check if any annotations need implementation (including from superclasses)
     annotations = get_all_type_hints(cls)
-    for attr_name in annotations:
-        if needs_implementation(cls, attr_name):
-            return True  # Unimplemented annotation = needs synthesis
-
-    # All annotations have implementations = concrete class, can be directly instantiated
-    return False
+    return any(needs_implementation(cls, attr_name) for attr_name in annotations)
 
 
 def _validate_component_dependencies(module_cls: type, component_type: type) -> None:
@@ -119,7 +114,9 @@ def _validate_component_dependencies(module_cls: type, component_type: type) -> 
         # Check type compatibility if module has type annotation
         if module_attr_name in module_annotations:
             provided_type = module_annotations[module_attr_name]
-            if not is_type_compatible(provided_type, dep_type):
+            if not is_type_compatible(
+                provided_type=provided_type, required_type=dep_type
+            ):
                 raise TypeError(
                     f"{component_type.__name__} requires '{dep_name}: {dep_type}' "
                     f"but {module_cls.__name__}.{module_attr_name} provides '{provided_type}'. "
@@ -143,7 +140,7 @@ def _create_direct_factory_func(
         A factory function that synthesizes instances with zero parameters
     """
 
-    def factory(self: Any) -> Any:
+    def factory(_: Any) -> Any:
         # Direct instantiation with no parameters (like Config())
         return component_type()
 
@@ -183,16 +180,16 @@ def _create_bound_factory_func(name: str, component_type: type) -> Callable[[Any
                 continue  # Already implemented, don't override
 
             def make_ingredient_binder(
-                attr_name: str, module_attr_name: str
+                attr_name: str, module_attr_name: str, bound_ingredient_type: type
             ) -> property:
-                def ingredient_binder(bound_self: Any) -> Any:
+                def ingredient_binder(_: Any) -> Any:
                     return getattr(module_instance, module_attr_name)
 
                 ingredient_binder.__name__ = attr_name
                 ingredient_binder.__doc__ = (
                     f"Get {module_attr_name.replace('_', ' ')} ingredient from module."
                 )
-                ingredient_binder.__annotations__ = {"return": ingredient_type}
+                ingredient_binder.__annotations__ = {"return": bound_ingredient_type}
 
                 return property(ingredient_binder)
 
@@ -201,7 +198,9 @@ def _create_bound_factory_func(name: str, component_type: type) -> Callable[[Any
             setattr(
                 SynthesizedComponent,
                 ingredient_name,
-                make_ingredient_binder(ingredient_name, module_attr_name),
+                make_ingredient_binder(
+                    ingredient_name, module_attr_name, ingredient_type
+                ),
             )
 
         # Set proper naming for debugging
@@ -306,11 +305,10 @@ def module(
     if isinstance(cls_or_strategy, CachingStrategy):
         # @module(CachingStrategy.NOT_THREAD_SAFE) - enum instance
         return lambda cls: decorator(cls, cls_or_strategy)
-    elif isinstance(cls_or_strategy, type):
+    if isinstance(cls_or_strategy, type):
         # @module - legacy, class being decorated
         return decorator(cls_or_strategy, CachingStrategy.DISABLED)
-    elif cls_or_strategy is None:
+    if cls_or_strategy is None:
         # @module() - explicit parentheses
         return lambda cls: decorator(cls, CachingStrategy.DISABLED)
-    else:
-        raise TypeError(f"Invalid argument to @module: {cls_or_strategy}")
+    raise TypeError(f"Invalid argument to @module: {cls_or_strategy}")

@@ -4,16 +4,13 @@
 
 from abc import ABC, abstractmethod
 from functools import cached_property
-from typing import Dict, Any
 from unittest.mock import Mock
 
-import pytest
-
 from src.reactor_di.type_utils import (
-    is_type_compatible,
-    safe_get_type_hints,
     get_all_type_hints,
+    is_type_compatible,
     needs_implementation,
+    safe_get_type_hints,
 )
 
 
@@ -22,11 +19,11 @@ class TestIsTypeCompatible:
 
     def test_string_annotations_matching(self):
         """Test exact string match path."""
-        assert is_type_compatible("MyClass", "MyClass")
+        assert is_type_compatible(provided_type="MyClass", required_type="MyClass")
 
     def test_string_annotations_not_matching(self):
         """Test string mismatch path."""
-        assert not is_type_compatible("ClassA", "ClassB")
+        assert not is_type_compatible(provided_type="ClassA", required_type="ClassB")
 
     def test_mixed_string_and_type_name_based(self):
         """Test name-based comparison with mixed types."""
@@ -34,17 +31,17 @@ class TestIsTypeCompatible:
         class MyClass:
             pass
 
-        assert is_type_compatible("MyClass", MyClass)
-        assert is_type_compatible(MyClass, "MyClass")
+        assert is_type_compatible(provided_type="MyClass", required_type=MyClass)
+        assert is_type_compatible(provided_type=MyClass, required_type="MyClass")
 
     def test_none_types_equal(self):
         """Test None == None path."""
-        assert is_type_compatible(None, None)
+        assert is_type_compatible(provided_type=None, required_type=None)
 
     def test_none_types_not_equal(self):
         """Test None != other type path."""
-        assert not is_type_compatible(None, str)
-        assert not is_type_compatible(str, None)
+        assert not is_type_compatible(provided_type=None, required_type=str)
+        assert not is_type_compatible(provided_type=str, required_type=None)
 
     def test_subclass_relationship_valid(self):
         """Test valid subclass path."""
@@ -55,7 +52,7 @@ class TestIsTypeCompatible:
         class Child(Parent):
             pass
 
-        assert is_type_compatible(Child, Parent)
+        assert is_type_compatible(provided_type=Child, required_type=Parent)
 
     def test_subclass_relationship_invalid(self):
         """Test invalid subclass path."""
@@ -66,12 +63,12 @@ class TestIsTypeCompatible:
         class Child(Parent):
             pass
 
-        assert not is_type_compatible(Parent, Child)
+        assert not is_type_compatible(provided_type=Parent, required_type=Child)
 
     def test_exact_type_match(self):
         """Test exact type equality path."""
-        assert is_type_compatible(str, str)
-        assert is_type_compatible(int, int)
+        assert is_type_compatible(provided_type=str, required_type=str)
+        assert is_type_compatible(provided_type=int, required_type=int)
 
     def test_issubclass_type_error_fallback(self):
         """Test TypeError handling in issubclass - conservative True fallback."""
@@ -80,14 +77,16 @@ class TestIsTypeCompatible:
         mock_type.__name__ = "MockType"
 
         # This should trigger TypeError and fallback to True
-        assert is_type_compatible(mock_type, str) is True
+        assert is_type_compatible(provided_type=mock_type, required_type=str) is True
 
     def test_conservative_fallback_for_complex_types(self):
         """Test conservative True fallback for unhandled types."""
         from typing import Union
 
         # Complex types should fallback to True
-        assert is_type_compatible(Union[str, int], Union[str, int])
+        assert is_type_compatible(
+            provided_type=Union[str, int], required_type=Union[str, int]
+        )
 
 
 class TestSafeGetTypeHints:
@@ -107,7 +106,7 @@ class TestSafeGetTypeHints:
 
         class BadAnnotations:
             # This will cause NameError in get_type_hints
-            attr: "NonexistentType"
+            attr: "NonexistentType"  # noqa: F821
 
         hints = safe_get_type_hints(BadAnnotations)
         assert hints == {"attr": "NonexistentType"}
@@ -150,8 +149,8 @@ class TestGetAllTypeHints:
         hints = get_all_type_hints(Child)
         assert "base_attr" in hints
         assert "child_attr" in hints
-        assert hints["base_attr"] == str
-        assert hints["child_attr"] == int
+        assert hints["base_attr"] is str
+        assert hints["child_attr"] is int
 
     def test_overridden_annotations(self):
         """Test child class annotations override parent ones."""
@@ -163,7 +162,7 @@ class TestGetAllTypeHints:
             attr: int  # Override parent annotation
 
         hints = get_all_type_hints(Child)
-        assert hints["attr"] == int  # Child should override
+        assert hints["attr"] is int  # Child should override
 
     def test_skip_object_base_class(self):
         """Test that object base class is skipped."""

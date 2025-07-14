@@ -35,7 +35,7 @@ class TestDecoratorIntegration:
             MockComponent, "_available_attr"
         ), "law_of_demeter should implement _available_attr"
         # Verify behavioral functionality of implemented attribute
-        assert isinstance(getattr(MockComponent, "_available_attr"), property)
+        assert isinstance(MockComponent._available_attr, property)
         test_instance = MockComponent()
         test_instance._config = MockConfig()
         assert test_instance._available_attr == "test_value"
@@ -94,7 +94,7 @@ class TestDecoratorIntegration:
             TestClass, "_existing_prop"
         ), "Should create property for existing attribute"
         # Verify behavioral functionality of created property
-        assert isinstance(getattr(TestClass, "_existing_prop"), property)
+        assert isinstance(TestClass._existing_prop, property)
         test_instance = TestClass()
         test_instance._base = MockBase()
         assert test_instance._existing_prop == "exists"
@@ -136,11 +136,11 @@ class TestDecoratorIntegration:
 
         assert hasattr(TestComponent, "_field1")
         # Verify property type and behavior for field1
-        assert isinstance(getattr(TestComponent, "_field1"), property)
+        assert isinstance(TestComponent._field1, property)
 
         assert hasattr(TestComponent, "_field2")
         # Verify property type and behavior for field2
-        assert isinstance(getattr(TestComponent, "_field2"), property)
+        assert isinstance(TestComponent._field2, property)
 
         assert not hasattr(TestComponent, "_nonexistent")
         # Verify nonexistent field access fails at instance level
@@ -172,7 +172,7 @@ class TestDecoratorIntegration:
         # Verify partial implementation
         assert hasattr(PartiallyImplementedComponent, "_app_name")
         # Verify _app_name property is properly implemented
-        assert isinstance(getattr(PartiallyImplementedComponent, "_app_name"), property)
+        assert isinstance(PartiallyImplementedComponent._app_name, property)
 
         assert not hasattr(PartiallyImplementedComponent, "_namespace")
         # Verify _namespace is truly missing from class

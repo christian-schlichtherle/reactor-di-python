@@ -25,7 +25,7 @@ import inspect
 from typing import Any, Type, get_type_hints
 
 
-def is_type_compatible(provided_type: Any, required_type: Any) -> bool:
+def is_type_compatible(*, provided_type: Any, required_type: Any) -> bool:
     """Check if provided ingredient type is compatible with required ingredient type.
 
     Args:

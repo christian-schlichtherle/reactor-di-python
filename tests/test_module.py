@@ -10,10 +10,10 @@ import pytest
 
 from src.reactor_di.caching import CachingStrategy
 from src.reactor_di.module import (
+    _create_bound_factory_func,
+    _create_direct_factory_func,
     _needs_synthesis,
     _validate_component_dependencies,
-    _create_direct_factory_func,
-    _create_bound_factory_func,
     module,
 )
 
@@ -57,7 +57,7 @@ class TestNeedsSynthesis:
     def test_abc_without_annotations_or_methods_returns_false(self):
         """Test ABC without annotations or abstract methods returns False."""
 
-        class EmptyABC(ABC):
+        class EmptyABC(ABC):  # noqa: B024
             pass
 
         assert not _needs_synthesis(EmptyABC)
@@ -67,7 +67,7 @@ class TestNeedsSynthesis:
 
         class ComponentWithBadAnnotations(ABC):
             # This will cause NameError when get_type_hints is called
-            _dependency: "NonexistentType"
+            _dependency: "NonexistentType"  # noqa: F821
 
         # Should fallback to __annotations__ and still return True
         assert _needs_synthesis(ComponentWithBadAnnotations)
@@ -75,7 +75,7 @@ class TestNeedsSynthesis:
     def test_no_annotations_attribute(self):
         """Test class without __annotations__ attribute."""
 
-        class NoAnnotations(ABC):
+        class NoAnnotations(ABC):  # noqa: B024
             pass
 
         # Remove __annotations__ to test the fallback
@@ -147,10 +147,10 @@ class TestValidateComponentDependencies:
 
         class ModuleClass:
             # Bad annotation that will cause NameError
-            config: "NonexistentType"
+            config: "NonexistentType"  # noqa: F821
 
         class Component:
-            _config: "NonexistentType"
+            _config: "NonexistentType"  # noqa: F821
 
         # Should fallback to __annotations__ and not raise
         _validate_component_dependencies(ModuleClass, Component)
@@ -245,7 +245,7 @@ class TestCreateBoundFactoryFunc:
         """Test fallback when get_type_hints raises exception."""
 
         class BadComponent(ABC):
-            _dependency: "NonexistentType"
+            _dependency: "NonexistentType"  # noqa: F821
 
         class MockModule:
             def __init__(self):
@@ -289,7 +289,7 @@ class TestModuleDecorator:
             config: str
 
         # Should have cached_property
-        assert isinstance(getattr(TestModule, "config"), cached_property)
+        assert isinstance(TestModule.config, cached_property)
         # Verify caching behavior actually works
         module_instance = TestModule()
         first_access = module_instance.config
@@ -305,7 +305,7 @@ class TestModuleDecorator:
             config: str
 
         # Should have property (DISABLED strategy)
-        assert isinstance(getattr(TestModule, "config"), property)
+        assert isinstance(TestModule.config, property)
         # Verify no caching behavior (new instance each time)
         module_instance = TestModule()
         first_access = module_instance.config
@@ -322,7 +322,7 @@ class TestModuleDecorator:
             config: str
 
         # Should have property (DISABLED strategy)
-        assert isinstance(getattr(TestModule, "config"), property)
+        assert isinstance(TestModule.config, property)
         # Verify functional behavior matches DISABLED strategy
         module_instance = TestModule()
         config_value = module_instance.config
@@ -416,11 +416,9 @@ class TestModuleDecorator:
 
             @module(CachingStrategy.DISABLED)
             class TestModule:
-                config: "UnresolvableType"
+                config: "UnresolvableType"  # noqa: F821
 
             # Should not raise exception, will use string as type
-            module_instance = TestModule()
-            # Accessing config will fail but decorator should work
             assert hasattr(TestModule, "config")
 
     def test_string_annotation_resolution_exception(self):
@@ -431,7 +429,7 @@ class TestModuleDecorator:
 
             @module(CachingStrategy.DISABLED)
             class TestModule:
-                config: "UnresolvableType"
+                config: "UnresolvableType"  # noqa: F821
 
             # Should handle exception and fallback to string type
             assert hasattr(TestModule, "config")
@@ -441,7 +439,7 @@ class TestModuleDecorator:
 
         @module(CachingStrategy.DISABLED)
         class TestModule:
-            config: "NonexistentType"  # Will cause NameError in get_type_hints
+            config: "NonexistentType"  # noqa: F821  # Will cause NameError in get_type_hints
 
         # Should fallback to __annotations__ and work
         assert hasattr(TestModule, "config")
@@ -456,7 +454,7 @@ class TestModuleDecorator:
         class TestModule:
             component: SimpleClass
 
-        descriptor = getattr(TestModule, "component")
+        descriptor = TestModule.component
         assert isinstance(descriptor, property)
         assert not isinstance(descriptor, cached_property)
         # Verify DISABLED strategy behavior - no caching
@@ -477,7 +475,7 @@ class TestModuleDecorator:
         class TestModule:
             component: SimpleClass
 
-        descriptor = getattr(TestModule, "component")
+        descriptor = TestModule.component
         assert isinstance(descriptor, cached_property)
         # Verify NOT_THREAD_SAFE strategy behavior - caching works
         module_instance = TestModule()
@@ -499,7 +497,7 @@ class TestModuleDecorator:
         class TestModule:
             component: SimpleClass
 
-        descriptor = getattr(TestModule, "component")
+        descriptor = TestModule.component
         # cached_property should have been configured with __set_name__
         assert isinstance(descriptor, cached_property)
         # We can't easily test __set_name__ was called, but if it works, it was called

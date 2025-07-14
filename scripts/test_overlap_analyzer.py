@@ -14,11 +14,11 @@ Output:
     - Recommendations for improving test isolation
 """
 
-import subprocess
 import json
+import subprocess
 import sys
-from pathlib import Path
 from collections import defaultdict
+from pathlib import Path
 from typing import Dict, List, Set
 
 
@@ -47,7 +47,7 @@ def run_coverage_for_single_test(test_name: str) -> Set[str]:
             return set()
 
         # Parse coverage JSON
-        with open("coverage.json", "r") as f:
+        with open("coverage.json") as f:
             coverage_data = json.load(f)
 
         covered_lines = set()
@@ -105,9 +105,7 @@ def analyze_test_overlap() -> Dict[str, List[str]]:
             line_to_tests[line].append(test)
 
     # Find overlapping lines (covered by multiple tests)
-    overlaps = {line: tests for line, tests in line_to_tests.items() if len(tests) > 1}
-
-    return overlaps
+    return {line: tests for line, tests in line_to_tests.items() if len(tests) > 1}
 
 
 def calculate_disjunctness_score(

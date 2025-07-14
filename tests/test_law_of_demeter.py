@@ -23,7 +23,6 @@ import pytest
 
 from src.reactor_di.law_of_demeter import law_of_demeter
 
-
 # =============================================================================
 # Test Fixtures and Helper Classes
 # =============================================================================
@@ -422,9 +421,9 @@ class TestLawOfDemeterTypeChecker:
         assert "_timeout" in annotations
         assert "_is_dry_run" in annotations
         assert "_argo_app_name" in annotations
-        assert annotations["_timeout"] == int
-        assert annotations["_is_dry_run"] == bool
-        assert annotations["_argo_app_name"] == str
+        assert annotations["_timeout"] is int
+        assert annotations["_is_dry_run"] is bool
+        assert annotations["_argo_app_name"] is str
 
     def test_manual_type_declarations_pattern(self):
         """Test the manual type declaration pattern for better IDE support."""
@@ -451,8 +450,8 @@ class TestLawOfDemeterTypeChecker:
 
         # Verify type annotations
         annotations = getattr(ManuallyTypedController, "__annotations__", {})
-        assert annotations["_timeout"] == int
-        assert annotations["_is_dry_run"] == bool
+        assert annotations["_timeout"] is int
+        assert annotations["_is_dry_run"] is bool
 
 
 class TestLawOfDemeterAttributeForwarding:
@@ -727,10 +726,8 @@ class TestLawOfDemeterAttributeForwarding:
                 """Simulate an ArgoCD controller method that checks dry run mode."""
                 if self._is_dry_run:
                     return "dry_run_mode"
-                else:
-                    return "production_mode"
+                return "production_mode"
 
-        config = ProductionConfig()
         module = ProductionModule()
         controller = SimulatedArgoCDController(module)
 
@@ -926,9 +923,7 @@ class TestLawOfDemeterAnnotationDriven:
         assert controller._cached_prop == "cached"
 
         # All properties are now regular properties (caching removed)
-        assert isinstance(
-            getattr(PreserveAnnotationController, "_cached_prop"), property
-        )
+        assert isinstance(PreserveAnnotationController._cached_prop, property)
         # Verify cached property behavior is removed (no caching)
         controller2 = PreserveAnnotationController(config)
         first_access = controller2._cached_prop
@@ -936,9 +931,7 @@ class TestLawOfDemeterAnnotationDriven:
         assert first_access == second_access == "cached"  # Same value
         # Note: Can't test identity since law_of_demeter forwards to base property
 
-        assert isinstance(
-            getattr(PreserveAnnotationController, "_regular_prop"), property
-        )
+        assert isinstance(PreserveAnnotationController._regular_prop, property)
         # Verify regular property still works correctly
         assert controller2._regular_prop == "regular"
 
@@ -1102,7 +1095,7 @@ class TestDecoratorEdgeCaseCoverage:
 
         # Test exception in __init__ type hints
         class ClassWithBadInit:
-            def __init__(self, param: "UndefinedType"):
+            def __init__(self, param: "UndefinedType"):  # noqa: F821
                 pass
 
         @law_of_demeter("config")
@@ -1142,7 +1135,7 @@ class TestDecoratorEdgeCaseCoverage:
         assert "cached_prop_accessed" in access_log
 
         # All properties are now regular properties
-        prop = getattr(UpgradeController, "_tracked_prop")
+        prop = UpgradeController._tracked_prop
         assert isinstance(prop, property)
 
 
@@ -1158,8 +1151,9 @@ class TestMissingCoverageLines:
         """Test lines 54-55: Exception in __init__ method type hints resolution."""
 
         # Mock get_type_hints to force an exception
-        import src.reactor_di.law_of_demeter as lod_module
         from typing import get_type_hints
+
+        import src.reactor_di.law_of_demeter as lod_module
 
         original_get_type_hints = get_type_hints
 
@@ -1504,7 +1498,7 @@ class TestMissingCoverageLines:
 
         # Test with module that doesn't have config (auto-setup should skip)
         bad_module = ModuleWithoutConfig()
-        controller2 = AutoSetupController(bad_module)
+        AutoSetupController(bad_module)
         # Auto-setup should detect missing config and skip
         # _config should not be set automatically in this case
         # We can't easily test this because the auto-setup logic is complex
@@ -1574,7 +1568,7 @@ class TestMissingCoverageLines:
             _timeout: int
 
         # Should create regular property (caching removed)
-        prop = getattr(AlwaysCacheController, "_timeout")
+        prop = AlwaysCacheController._timeout
         assert isinstance(prop, property)
 
         # Test line 472 - skip logic for decorator name conflicts
@@ -1604,7 +1598,7 @@ class TestMissingCoverageLines:
             _timeout: int
 
         # Verify property is working correctly (no __set_name__ needed for regular properties)
-        prop = getattr(SetNameController, "_timeout")
+        prop = SetNameController._timeout
         assert isinstance(prop, property)
         # Property should work correctly
 
@@ -1711,10 +1705,11 @@ class TestCanResolveAnnotationCoverageGaps:
     def test_get_type_hints_exception_in_init_annotations(self):
         """Target lines 89-90: Exception handling in get_type_hints for __init__."""
         from unittest.mock import patch
+
         from src.reactor_di.law_of_demeter import _can_resolve_annotation
 
         class TestClass:
-            def __init__(self, base_ref: "NonexistentType"):
+            def __init__(self, base_ref: "NonexistentType"):  # noqa: F821
                 pass
 
         # Mock get_type_hints to raise an exception
@@ -1745,6 +1740,7 @@ class TestCanResolveAnnotationCoverageGaps:
     def test_attribute_error_in_init_parameter_lookup(self):
         """Target lines 89-90: AttributeError in init parameter lookup."""
         from unittest.mock import patch
+
         from src.reactor_di.law_of_demeter import _can_resolve_annotation
 
         class TestClass:
@@ -1767,6 +1763,7 @@ class TestCanResolveAnnotationCoverageGaps:
     def test_type_error_in_init_parameter_lookup(self):
         """Target lines 89-90: TypeError in init parameter lookup."""
         from unittest.mock import patch
+
         from src.reactor_di.law_of_demeter import _can_resolve_annotation
 
         class TestClass:
