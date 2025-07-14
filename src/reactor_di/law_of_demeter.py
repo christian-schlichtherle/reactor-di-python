@@ -43,7 +43,7 @@ For detailed usage examples and advanced patterns, see the law_of_demeter functi
 """
 
 from functools import wraps
-from typing import Any, Callable, Type, Union, get_type_hints
+from typing import Any, Callable, Type, get_type_hints
 
 from .type_utils import (
     _is_type_compatible,
