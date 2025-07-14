@@ -1,6 +1,6 @@
 # Reactor DI
 
-[![CI](https://github.com/christian-schlichtherle/reactor-di-python/actions/workflows/ci.yml/badge.svg)](https://github.com/christian-schlichtherle/reactor-di-python/actions/workflows/ci.yml)
+[![CI](https://github.com/christian-schlichtherle/reactor-di-python/actions/workflows/ci.yaml/badge.svg)](https://github.com/christian-schlichtherle/reactor-di-python/actions/workflows/ci.yaml)
 [![PyPI version](https://badge.fury.io/py/reactor-di.svg)](https://badge.fury.io/py/reactor-di)
 [![Coverage Status](https://codecov.io/gh/christian-schlichtherle/reactor-di-python/branch/main/graph/badge.svg)](https://codecov.io/gh/christian-schlichtherle/reactor-di-python)
 [![Python versions](https://img.shields.io/pypi/pyversions/reactor-di.svg)](https://pypi.org/project/reactor-di/)
