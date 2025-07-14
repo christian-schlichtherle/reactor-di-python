@@ -26,9 +26,107 @@ pip install reactor-di
 ## Quick Start
 
 ```python
-from reactor_di import module, law_of_demeter
+from abc import ABC
+from reactor_di import module, law_of_demeter, CachingStrategy
 
-# Usage examples will be added when decorators are implemented
+# Example: Database service with configuration forwarding
+class DatabaseConfig:
+    host = "localhost"
+    port = 5432
+    timeout = 30
+
+class DatabaseService(ABC):
+    _config: DatabaseConfig
+    _host: str      # Forwarded from config.host
+    _port: int      # Forwarded from config.port
+    _timeout: int   # Forwarded from config.timeout
+    
+    def connect(self) -> str:
+        return f"Connected to {self._host}:{self._port} (timeout: {self._timeout}s)"
+
+# Law of Demeter: Create forwarding properties for clean access
+@law_of_demeter("_config")
+class CleanDatabaseService(DatabaseService):
+    pass
+
+# Module: Automatic dependency injection with caching
+@module(CachingStrategy.NOT_THREAD_SAFE)
+class AppModule:
+    config: DatabaseConfig      # Directly instantiated
+    database: CleanDatabaseService  # Synthesized with dependencies
+
+# Usage
+app = AppModule()
+db_service = app.database
+print(db_service.connect())  # → "Connected to localhost:5432 (timeout: 30s)"
+
+# Properties are cleanly forwarded
+print(db_service._host)      # → "localhost" (from config.host)
+print(db_service._timeout)   # → 30 (from config.timeout)
+```
+
+## Architecture
+
+Reactor DI uses a **modular file structure** for clean separation of concerns:
+
+- **`module.py`** - The `@module` decorator for dependency injection containers
+- **`law_of_demeter.py`** - The `@law_of_demeter` decorator for property forwarding
+- **`caching.py`** - Caching strategies (`CachingStrategy.DISABLED`, `CachingStrategy.NOT_THREAD_SAFE`)
+- **`type_utils.py`** - Shared type checking utilities used across decorators
+
+The decorators work together seamlessly - `@law_of_demeter` creates forwarding properties that `@module` recognizes during dependency validation, enabling clean cooperation without special configuration.
+
+## Advanced Usage
+
+### Caching Strategies
+
+```python
+from reactor_di import module, CachingStrategy
+
+# No caching - components created fresh each time
+@module(CachingStrategy.DISABLED)
+class DevModule:
+    service: MyService
+
+# Cached components - same instance returned (not thread-safe)
+@module(CachingStrategy.NOT_THREAD_SAFE)
+class ProdModule:
+    service: MyService
+```
+
+### Multiple Decorator Integration
+
+```python
+@law_of_demeter("_config")    # Creates forwarding properties
+@law_of_demeter("_module")    # Auto-setup: self._config = self._module.config
+class ResourceController:
+    def __init__(self, module):
+        self._module = module
+        # Decorator automatically sets up: self._config = module.config
+    
+    # From _config
+    _timeout: int
+    _is_dry_run: bool
+    
+    # From _module  
+    _api: object
+    _namespace: str
+```
+
+### Custom Prefixes
+
+```python
+# No prefix - direct forwarding
+@law_of_demeter('config', prefix='')
+class DirectController:
+    timeout: int        # → config.timeout
+    is_dry_run: bool    # → config.is_dry_run
+
+# Custom prefix
+@law_of_demeter('config', prefix='cfg_')
+class PrefixController:
+    cfg_timeout: int        # → config.timeout
+    cfg_is_dry_run: bool    # → config.is_dry_run
 ```
 
 ## Development
@@ -58,7 +156,7 @@ uv run pytest
 uv run pytest --cov=reactor_di
 
 # Run specific test file
-uv run pytest tests/test_decorators.py
+uv run pytest tests/test_module.py
 ```
 
 ### Code Quality

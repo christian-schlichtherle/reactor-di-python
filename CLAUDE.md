@@ -23,7 +23,7 @@ A code generator for dependency injection (DI) in Python based on the mediator a
 ### Testing
 - `uv run pytest` - Run all tests with coverage
 - `uv run pytest --cov=reactor_di` - Run tests with coverage reporting
-- `uv run pytest tests/test_decorators.py` - Run specific test file
+- `uv run pytest tests/test_module.py` - Run specific test file
 - `uv run pytest -m "not slow"` - Skip slow tests
 
 ### Code Quality
@@ -40,17 +40,23 @@ A code generator for dependency injection (DI) in Python based on the mediator a
 
 ```
 reactor-di-python/
-├── src/reactor_di/          # Main package (src-layout)
-│   ├── __init__.py         # Package initialization
-│   └── py.typed            # Type marker for mypy
-├── tests/                  # Test suite
-│   ├── test_decorators.py  # Unit tests for decorators
-│   └── test_integration.py # Integration tests
-├── docs/                   # Documentation
-├── .github/workflows/      # CI/CD pipelines
-│   ├── ci.yml             # Matrix testing across Python versions
-│   └── publish.yml        # PyPI deployment
-└── pyproject.toml         # Modern Python configuration
+├── src/reactor_di/              # Main package (src-layout)
+│   ├── __init__.py             # Package initialization
+│   ├── module.py               # @module decorator for DI containers
+│   ├── law_of_demeter.py       # @law_of_demeter decorator for property forwarding
+│   ├── caching.py              # CachingStrategy enum for component caching
+│   ├── type_utils.py           # Shared type checking utilities
+│   └── py.typed                # Type marker for mypy
+├── tests/                      # Test suite
+│   ├── test_module.py          # Tests for @module decorator
+│   ├── test_law_of_demeter.py  # Tests for @law_of_demeter decorator
+│   ├── test_caching.py         # Tests for caching strategies
+│   └── test_decorator_cooperation.py # Integration tests between decorators
+├── docs/                       # Documentation
+├── .github/workflows/          # CI/CD pipelines
+│   ├── ci.yml                 # Matrix testing across Python versions
+│   └── publish.yml            # PyPI deployment
+└── pyproject.toml             # Modern Python configuration
 ```
 
 ## Architecture
