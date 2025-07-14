@@ -9,7 +9,7 @@ description = "A code generator for dependency injection (DI) in Python which is
 readme = "README.md"
 requires-python = ">=3.8"
 authors = [
-    {name = "Christian"},
+    {name = "Christian Schlichtherle"},
 ]
 license = {text = "MIT"}
 keywords = ["dependency-injection", "di", "code-generation", "mediator", "factory"]
@@ -30,9 +30,9 @@ classifiers = [
 dependencies = []
 
 [project.urls]
-Homepage = "https://github.com/your-username/reactor-di-python"
-Repository = "https://github.com/your-username/reactor-di-python"
-Issues = "https://github.com/your-username/reactor-di-python/issues"
+Homepage = "https://github.com/christian-schlichtherle/reactor-di-python"
+Repository = "https://github.com/christian-schlichtherle/reactor-di-python"
+Issues = "https://github.com/christian-schlichtherle/reactor-di-python/issues"
 
 [dependency-groups]
 test = [
