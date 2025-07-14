@@ -149,14 +149,17 @@ This project uses modern Python tooling and best practices:
 ### Running Tests
 
 ```bash
-# Run all tests
+# Run all tests (126 tests, 100% coverage)
 uv run pytest
 
-# Run tests with coverage
+# Run tests with coverage reporting
 uv run pytest --cov=reactor_di
 
-# Run specific test file
-uv run pytest tests/test_module.py
+# Run specific test modules
+uv run pytest tests/test_module.py          # Module decorator tests
+uv run pytest tests/test_law_of_demeter.py  # Law of Demeter decorator tests  
+uv run pytest tests/test_type_utils.py      # Type compatibility utilities tests
+uv run pytest tests/test_integration.py     # Integration tests between decorators
 ```
 
 ### Code Quality
@@ -178,9 +181,10 @@ uv run black src tests
 1. Fork the repository
 2. Create a feature branch
 3. Make your changes
-4. Add tests for new functionality
-5. Ensure all tests pass and coverage is maintained
-6. Submit a pull request
+4. Add tests for new functionality with meaningful assertions
+5. Ensure all tests pass and 100% coverage is maintained  
+6. Verify realistic code scenarios rather than mocking impossible edge cases
+7. Submit a pull request
 
 ## License
 

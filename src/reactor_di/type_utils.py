@@ -14,6 +14,11 @@ Key Functions:
 The functions systematically search the Method Resolution Order (MRO) to find
 annotations and abstract attributes from the entire class hierarchy, ensuring
 proper decorator behavior with complex inheritance patterns.
+
+Design Note:
+The type compatibility logic prioritizes simplicity and realistic scenarios over
+defensive programming. Exception handling for unrealistic edge cases has been
+removed in favor of letting real errors propagate for proper debugging.
 """
 
 import inspect
