@@ -158,13 +158,31 @@ class TestLawOfDemeterSideEffects:
         ), f"Unexpected property calls during init: {property_call_log}"
 
         # Access properties - now they should be called
+        # Capture initial state
+        initial_log_length = len(property_call_log)
+        assert initial_log_length == 0
+
         timeout = controller._timeout
+        # Verify state change after first access
+        first_access_log_length = len(property_call_log)
+        assert first_access_log_length == 1
+        assert property_call_log[-1] == "config.timeout called"
+
         is_dry_run = controller._is_dry_run
+        # Verify state change after second access
+        second_access_log_length = len(property_call_log)
+        assert second_access_log_length == 2
+        assert property_call_log[-1] == "config.is_dry_run called"
 
         assert timeout == 300
         assert is_dry_run is True
         assert "config.timeout called" in property_call_log
         assert "config.is_dry_run called" in property_call_log
+        # Verify exact call order
+        assert property_call_log == [
+            "config.timeout called",
+            "config.is_dry_run called",
+        ]
 
     def test_properties_called_only_when_accessed(self):
         """Test that properties are only called when explicitly accessed."""
@@ -193,17 +211,33 @@ class TestLawOfDemeterSideEffects:
         config = SelectiveTrackedConfig()
         controller = SelectiveController(config)
 
+        # Verify initial state - no calls yet
+        initial_timeout_count = call_counts["timeout"]
+        initial_dry_run_count = call_counts["is_dry_run"]
+        assert initial_timeout_count == 0
+        assert initial_dry_run_count == 0
+        assert sum(call_counts.values()) == 0
+
         # Access only timeout
         timeout = controller._timeout
+        # Verify state change after timeout access
         assert timeout == 300
-        assert call_counts["timeout"] == 1
-        assert call_counts["is_dry_run"] == 0  # Should not be called
+        assert call_counts["timeout"] == initial_timeout_count + 1
+        assert (
+            call_counts["is_dry_run"] == initial_dry_run_count
+        )  # Should not be called
+        assert sum(call_counts.values()) == 1  # Total calls should be 1
 
         # Access is_dry_run
+        pre_dry_run_timeout_count = call_counts["timeout"]
         is_dry_run = controller._is_dry_run
+        # Verify state change after is_dry_run access
         assert is_dry_run is True
-        assert call_counts["timeout"] == 1  # Should still be 1
-        assert call_counts["is_dry_run"] == 1
+        assert (
+            call_counts["timeout"] == pre_dry_run_timeout_count
+        )  # Should still be same
+        assert call_counts["is_dry_run"] == initial_dry_run_count + 1
+        assert sum(call_counts.values()) == 2  # Total calls should be 2
 
     def test_properties_with_initialization_dependencies(self):
         """Test that properties work correctly when config has initialization dependencies."""
@@ -327,18 +361,41 @@ class TestLawOfDemeterPerformance:
 
         # Clear log after object creation
         evaluation_log.clear()
+        # Verify initial state
+        initial_log_size = len(evaluation_log)
+        assert initial_log_size == 0
 
         # Access only one property
         result1 = controller._expensive_operation_1
-
+        # Verify state change after first property access
+        first_access_log_size = len(evaluation_log)
+        assert first_access_log_size == 1
         assert result1 == "result1"
         assert evaluation_log == ["expensive_operation_1 evaluated"]
+        assert evaluation_log[-1] == "expensive_operation_1 evaluated"
 
         # Access second property
+        pre_second_access_log_size = len(evaluation_log)
         result2 = controller._expensive_operation_2
-
+        # Verify state change after second property access
+        second_access_log_size = len(evaluation_log)
+        assert second_access_log_size == pre_second_access_log_size + 1
         assert result2 == "result2"
         assert evaluation_log == [
+            "expensive_operation_1 evaluated",
+            "expensive_operation_2 evaluated",
+        ]
+        assert evaluation_log[-1] == "expensive_operation_2 evaluated"
+
+        # Verify additional evaluations on repeat access (law_of_demeter forwards each time)
+        result1_again = controller._expensive_operation_1
+        result2_again = controller._expensive_operation_2
+        final_log_size = len(evaluation_log)
+        assert final_log_size == 4  # Should be 4: each property called twice
+        assert result1_again == "result1"
+        assert result2_again == "result2"
+        # Verify the forwarding behavior creates new evaluations
+        assert evaluation_log[-2:] == [
             "expensive_operation_1 evaluated",
             "expensive_operation_2 evaluated",
         ]
@@ -872,9 +929,18 @@ class TestLawOfDemeterAnnotationDriven:
         assert isinstance(
             getattr(PreserveAnnotationController, "_cached_prop"), property
         )
+        # Verify cached property behavior is removed (no caching)
+        controller2 = PreserveAnnotationController(config)
+        first_access = controller2._cached_prop
+        second_access = controller2._cached_prop
+        assert first_access == second_access == "cached"  # Same value
+        # Note: Can't test identity since law_of_demeter forwards to base property
+
         assert isinstance(
             getattr(PreserveAnnotationController, "_regular_prop"), property
         )
+        # Verify regular property still works correctly
+        assert controller2._regular_prop == "regular"
 
 
 # =============================================================================
@@ -1632,3 +1698,194 @@ class TestFinalCoverageLines:
             _ = controller._fail_attr1
         with pytest.raises(AttributeError):
             _ = controller._fail_attr2
+
+
+# =============================================================================
+# Additional Coverage Gap Tests (Merged from test_law_of_demeter_coverage_gaps.py)
+# =============================================================================
+
+
+class TestCanResolveAnnotationCoverageGaps:
+    """Target specific uncovered lines in _can_resolve_annotation."""
+
+    def test_get_type_hints_exception_in_init_annotations(self):
+        """Target lines 89-90: Exception handling in get_type_hints for __init__."""
+        from unittest.mock import patch
+        from src.reactor_di.law_of_demeter import _can_resolve_annotation
+
+        class TestClass:
+            def __init__(self, base_ref: "NonexistentType"):
+                pass
+
+        # Mock get_type_hints to raise an exception
+        with patch("src.reactor_di.law_of_demeter.get_type_hints") as mock_get_hints:
+            mock_get_hints.side_effect = NameError("NonexistentType not found")
+
+            # This should trigger lines 89-90: except (NameError, AttributeError, TypeError): pass
+            result = _can_resolve_annotation(TestClass, "base_ref", "target_attr", str)
+
+            # Should return True (skip validation when no type found)
+            assert result is True
+
+    def test_private_target_attribute_rejection(self):
+        """Target line 104: Return False for private target attribute names."""
+        from src.reactor_di.law_of_demeter import _can_resolve_annotation
+
+        class MockConfig:
+            public_attr = "value"
+            _private_attr = "private"
+
+        class TestClass:
+            config: MockConfig
+
+        # This should hit line 104: return False for private attributes
+        result = _can_resolve_annotation(TestClass, "config", "_private_attr", str)
+        assert result is False
+
+    def test_attribute_error_in_init_parameter_lookup(self):
+        """Target lines 89-90: AttributeError in init parameter lookup."""
+        from unittest.mock import patch
+        from src.reactor_di.law_of_demeter import _can_resolve_annotation
+
+        class TestClass:
+            def __init__(self, base_ref):
+                # This __init__ has parameters but will cause AttributeError in get_type_hints
+                pass
+
+        with patch("src.reactor_di.law_of_demeter.get_type_hints") as mock_get_hints:
+            # First call (for class annotations) returns empty
+            # Second call (for __init__ annotations) raises AttributeError
+            mock_get_hints.side_effect = [
+                {},
+                AttributeError("__init__ has no annotations"),
+            ]
+
+            result = _can_resolve_annotation(TestClass, "base_ref", "target_attr", str)
+            # Should return True (skip validation)
+            assert result is True
+
+    def test_type_error_in_init_parameter_lookup(self):
+        """Target lines 89-90: TypeError in init parameter lookup."""
+        from unittest.mock import patch
+        from src.reactor_di.law_of_demeter import _can_resolve_annotation
+
+        class TestClass:
+            def __init__(self):
+                pass
+
+        with patch("src.reactor_di.law_of_demeter.get_type_hints") as mock_get_hints:
+            # First call succeeds with empty dict, second call raises TypeError
+            mock_get_hints.side_effect = [{}, TypeError("Cannot evaluate type hints")]
+
+            result = _can_resolve_annotation(TestClass, "base_ref", "target_attr", str)
+            # Should return True (skip validation)
+            assert result is True
+
+
+class TestStackedDecoratorAttributeErrorHandling:
+    """Target lines 303-304: AttributeError handling in stacked decorator getter."""
+
+    def test_attribute_error_in_stacked_decorator_loop(self):
+        """Target lines 303-304: AttributeError when getattr fails in stacked decorators."""
+        from unittest.mock import Mock
+
+        @law_of_demeter("_missing_base")  # This base doesn't exist
+        @law_of_demeter("_existing_base")
+        class TestClass:
+            _existing_attr: str
+            _missing_base: object  # This will be missing at runtime
+            _existing_base: object
+
+            def __init__(self):
+                self._existing_base = Mock()
+                self._existing_base.existing_attr = "value"
+                # Intentionally NOT setting _missing_base
+
+        instance = TestClass()
+
+        # This should trigger lines 303-304: AttributeError when trying to access _missing_base
+        # The decorator should continue to the next base and eventually find _existing_base
+        result = instance._existing_attr
+        assert result == "value"
+
+    def test_all_stacked_bases_fail_fallback_to_original(self):
+        """Test fallback to original base_ref when all stacked bases fail."""
+
+        class MockBase:
+            target_attr = "fallback_value"
+
+        @law_of_demeter("_base")
+        class TestClass:
+            _target_attr: str
+            _base: MockBase
+
+            def __init__(self):
+                self._base = MockBase()
+
+        # Manually add decorators list with non-existent bases
+        TestClass.__law_of_demeter_decorators__ = ["_nonexistent1", "_nonexistent2"]
+
+        instance = TestClass()
+
+        # Should try _nonexistent1, _nonexistent2 (both fail), then fallback to _base
+        result = instance._target_attr
+        assert result == "fallback_value"
+
+    def test_hasattr_check_prevents_dict_access_error(self):
+        """Test that hasattr check works when __dict__ doesn't exist."""
+
+        class NoDict:
+            """Object without __dict__."""
+
+            __slots__ = ["target_attr"]
+
+            def __init__(self):
+                self.target_attr = "slots_value"
+
+        @law_of_demeter("_base")
+        class TestClass:
+            _target_attr: str
+            _base: NoDict
+
+            def __init__(self):
+                self._base = NoDict()
+
+        instance = TestClass()
+
+        # Should handle object without __dict__ gracefully
+        result = instance._target_attr
+        assert result == "slots_value"
+
+
+class TestShouldHandleAnnotationEdgeCases:
+    """Comprehensive tests for _should_handle_annotation edge cases."""
+
+    def test_empty_prefix_public_annotation(self):
+        """Test empty prefix with public annotation."""
+        from src.reactor_di.law_of_demeter import _should_handle_annotation
+
+        assert _should_handle_annotation("public_attr", "") is True
+
+    def test_empty_prefix_private_annotation(self):
+        """Test empty prefix with private annotation."""
+        from src.reactor_di.law_of_demeter import _should_handle_annotation
+
+        assert _should_handle_annotation("_private_attr", "") is False
+
+    def test_matching_prefix(self):
+        """Test annotation matching prefix."""
+        from src.reactor_di.law_of_demeter import _should_handle_annotation
+
+        assert _should_handle_annotation("_config_attr", "_config") is True
+
+    def test_non_matching_prefix(self):
+        """Test annotation not matching prefix."""
+        from src.reactor_di.law_of_demeter import _should_handle_annotation
+
+        assert _should_handle_annotation("_other_attr", "_config") is False
+
+    def test_partial_prefix_match(self):
+        """Test partial prefix match (should still match)."""
+        from src.reactor_di.law_of_demeter import _should_handle_annotation
+
+        assert _should_handle_annotation("_cfg_timeout", "_cfg") is True

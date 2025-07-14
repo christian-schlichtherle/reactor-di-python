@@ -1,4 +1,4 @@
-"""Tests for decorator cooperation."""
+"""Integration tests for decorator cooperation and cross-module functionality."""
 
 # type: ignore
 
@@ -11,8 +11,8 @@ from src.reactor_di.law_of_demeter import law_of_demeter
 from src.reactor_di.module import module
 
 
-class TestDecoratorCooperation:
-    """Test cooperation between @module and @law_of_demeter decorators."""
+class TestDecoratorIntegration:
+    """Test integration between @module and @law_of_demeter decorators."""
 
     def test_validation_skips_implemented_dependencies(self):
         """Test that validation only checks unimplemented dependencies."""
@@ -34,12 +34,24 @@ class TestDecoratorCooperation:
         assert hasattr(
             MockComponent, "_available_attr"
         ), "law_of_demeter should implement _available_attr"
+        # Verify behavioral functionality of implemented attribute
+        assert isinstance(getattr(MockComponent, "_available_attr"), property)
+        test_instance = MockComponent()
+        test_instance._config = MockConfig()
+        assert test_instance._available_attr == "test_value"
+
         assert not hasattr(
             MockComponent, "_missing_attr"
         ), "law_of_demeter should NOT implement _missing_attr"
+        # Verify missing attribute truly doesn't exist and would fail
+        with pytest.raises(AttributeError):
+            _ = test_instance._missing_attr
+
         assert not hasattr(
             MockComponent, "_config"
         ), "law_of_demeter should NOT implement _config (base ref)"
+        # Verify base ref is handled manually, not by decorator
+        assert test_instance._config.available_attr == "test_value"
 
         # Now module decorator should only validate unimplemented dependencies
         @module(CachingStrategy.NOT_THREAD_SAFE)
@@ -81,12 +93,24 @@ class TestDecoratorCooperation:
         assert hasattr(
             TestClass, "_existing_prop"
         ), "Should create property for existing attribute"
+        # Verify behavioral functionality of created property
+        assert isinstance(getattr(TestClass, "_existing_prop"), property)
+        test_instance = TestClass()
+        test_instance._base = MockBase()
+        assert test_instance._existing_prop == "exists"
+
         assert not hasattr(
             TestClass, "_missing_prop"
         ), "Should NOT create property for missing attribute"
+        # Verify missing property access fails appropriately
+        with pytest.raises(AttributeError):
+            _ = test_instance._missing_prop
+
         assert not hasattr(
             TestClass, "_base"
         ), "Should NOT create property for base reference"
+        # Verify base reference works as normal attribute
+        assert test_instance._base.existing_prop == "exists"
 
     def test_law_of_demeter_with_pydantic_models(self):
         """Test law_of_demeter works with Pydantic-style models."""
@@ -111,8 +135,19 @@ class TestDecoratorCooperation:
             _config: MockPydanticConfig
 
         assert hasattr(TestComponent, "_field1")
+        # Verify property type and behavior for field1
+        assert isinstance(getattr(TestComponent, "_field1"), property)
+
         assert hasattr(TestComponent, "_field2")
+        # Verify property type and behavior for field2
+        assert isinstance(getattr(TestComponent, "_field2"), property)
+
         assert not hasattr(TestComponent, "_nonexistent")
+        # Verify nonexistent field access fails at instance level
+        temp_instance = TestComponent()
+        temp_instance._config = MockPydanticConfig()
+        with pytest.raises(AttributeError):
+            _ = temp_instance._nonexistent
 
         # Test runtime behavior
         instance = TestComponent()
@@ -136,8 +171,16 @@ class TestDecoratorCooperation:
 
         # Verify partial implementation
         assert hasattr(PartiallyImplementedComponent, "_app_name")
+        # Verify _app_name property is properly implemented
+        assert isinstance(getattr(PartiallyImplementedComponent, "_app_name"), property)
+
         assert not hasattr(PartiallyImplementedComponent, "_namespace")
+        # Verify _namespace is truly missing from class
+        assert "_namespace" not in PartiallyImplementedComponent.__dict__
+
         assert not hasattr(PartiallyImplementedComponent, "_config")
+        # Verify _config is not implemented as property by decorator
+        assert "_config" not in PartiallyImplementedComponent.__dict__
 
         @module(CachingStrategy.NOT_THREAD_SAFE)
         class TestModule:
@@ -178,6 +221,13 @@ class TestDecoratorCooperation:
 
         # law_of_demeter should not implement _missing_in_config
         assert not hasattr(ComponentWithMissingDeps, "_missing_in_config")
+        # Verify property is truly not created in class dict
+        assert "_missing_in_config" not in ComponentWithMissingDeps.__dict__
+        # Verify instance access would fail without module providing it
+        temp_instance = ComponentWithMissingDeps()
+        temp_instance._config = MockConfig()
+        with pytest.raises(AttributeError):
+            _ = temp_instance._missing_in_config
 
         # Module should fail validation for missing dependencies
         # The validation will check both _missing_in_config and _missing_in_module

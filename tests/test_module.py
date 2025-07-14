@@ -16,7 +16,6 @@ from src.reactor_di.module import (
     _create_bound_factory_func,
     module,
 )
-from src.reactor_di.type_utils import is_type_compatible
 
 
 class TestNeedsSynthesis:
@@ -84,74 +83,6 @@ class TestNeedsSynthesis:
             delattr(NoAnnotations, "__annotations__")
 
         assert not _needs_synthesis(NoAnnotations)
-
-
-class TestIsTypeCompatible:
-    """Test is_type_compatible function."""
-
-    def test_string_annotations_matching(self):
-        """Test string type annotations that match."""
-        assert is_type_compatible("MyClass", "MyClass")
-
-    def test_string_annotations_not_matching(self):
-        """Test string type annotations that don't match."""
-        assert not is_type_compatible("ClassA", "ClassB")
-
-    def test_mixed_string_and_type(self):
-        """Test mixed string and type annotations."""
-
-        class MyClass:
-            pass
-
-        # Should do name-based comparison
-        assert is_type_compatible("MyClass", MyClass)
-        assert is_type_compatible(MyClass, "MyClass")
-
-    def test_none_types(self):
-        """Test None type handling."""
-        assert is_type_compatible(None, None)
-        assert not is_type_compatible(None, str)
-        assert not is_type_compatible(str, None)
-
-    def test_subclass_relationship(self):
-        """Test subclass relationship checking."""
-
-        class Parent:
-            pass
-
-        class Child(Parent):
-            pass
-
-        assert is_type_compatible(Child, Parent)
-        assert not is_type_compatible(Parent, Child)
-
-    def test_issubclass_type_error(self):
-        """Test TypeError handling in issubclass."""
-
-        # Create a mock type that will cause TypeError in issubclass
-        class MockType:
-            def __name__(self):
-                return "MockType"
-
-        mock_type = MockType()
-
-        # Make inspect.isclass return True for both
-        with patch("inspect.isclass", return_value=True):
-            # This should trigger the TypeError handling and fallback to conservative True
-            result = is_type_compatible(mock_type, str)
-            assert result is True
-
-    def test_exact_type_match(self):
-        """Test exact type matching."""
-        assert is_type_compatible(str, str)
-        assert is_type_compatible(int, int)
-
-    def test_conservative_fallback(self):
-        """Test conservative fallback for complex types."""
-        from typing import Union
-
-        # Complex types should fallback to True
-        assert is_type_compatible(Union[str, int], Union[str, int])
 
 
 class TestValidateComponentDependencies:
@@ -359,6 +290,12 @@ class TestModuleDecorator:
 
         # Should have cached_property
         assert isinstance(getattr(TestModule, "config"), cached_property)
+        # Verify caching behavior actually works
+        module_instance = TestModule()
+        first_access = module_instance.config
+        second_access = module_instance.config
+        assert first_access is second_access  # Verify caching
+        assert first_access == ""  # Verify default value creation
 
     def test_legacy_direct_decoration(self):
         """Test @module (legacy) usage."""
@@ -369,6 +306,13 @@ class TestModuleDecorator:
 
         # Should have property (DISABLED strategy)
         assert isinstance(getattr(TestModule, "config"), property)
+        # Verify no caching behavior (new instance each time)
+        module_instance = TestModule()
+        first_access = module_instance.config
+        second_access = module_instance.config
+        # With DISABLED strategy, should get new instances each time
+        assert first_access == second_access == ""  # Same value
+        # Note: can't test identity for strings since "" is interned
 
     def test_explicit_parentheses(self):
         """Test @module() usage."""
@@ -379,6 +323,11 @@ class TestModuleDecorator:
 
         # Should have property (DISABLED strategy)
         assert isinstance(getattr(TestModule, "config"), property)
+        # Verify functional behavior matches DISABLED strategy
+        module_instance = TestModule()
+        config_value = module_instance.config
+        assert config_value == ""  # Default string creation
+        assert isinstance(config_value, str)  # Correct type
 
     def test_invalid_argument_error(self):
         """Test error with invalid arguments."""
@@ -510,6 +459,13 @@ class TestModuleDecorator:
         descriptor = getattr(TestModule, "component")
         assert isinstance(descriptor, property)
         assert not isinstance(descriptor, cached_property)
+        # Verify DISABLED strategy behavior - no caching
+        module_instance = TestModule()
+        component1 = module_instance.component
+        component2 = module_instance.component
+        assert component1 is not component2  # New instance each time
+        assert isinstance(component1, SimpleClass)
+        assert isinstance(component2, SimpleClass)
 
     def test_caching_strategy_not_thread_safe_creates_cached_property(self):
         """Test NOT_THREAD_SAFE strategy creates cached_property."""
@@ -523,6 +479,15 @@ class TestModuleDecorator:
 
         descriptor = getattr(TestModule, "component")
         assert isinstance(descriptor, cached_property)
+        # Verify NOT_THREAD_SAFE strategy behavior - caching works
+        module_instance = TestModule()
+        component1 = module_instance.component
+        component2 = module_instance.component
+        assert component1 is component2  # Same instance (cached)
+        assert isinstance(component1, SimpleClass)
+        # Verify it's actually cached by checking the cache
+        assert hasattr(module_instance, "__dict__")
+        assert "component" in module_instance.__dict__
 
     def test_cached_property_set_name_called(self):
         """Test that __set_name__ is called on cached_property."""

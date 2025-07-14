@@ -30,6 +30,10 @@ def is_type_compatible(provided_type: Any, required_type: Any) -> bool:
     Returns:
         True if provided_type can react with required_type
     """
+    # Exact type match
+    if provided_type == required_type:
+        return True
+
     # Handle string type annotations
     if isinstance(provided_type, str) or isinstance(required_type, str):
         # For string annotations, we can only do name-based comparison
@@ -42,16 +46,8 @@ def is_type_compatible(provided_type: Any, required_type: Any) -> bool:
         return provided_type is required_type
 
     # Try subclass relationship for classes
-    try:
-        if inspect.isclass(provided_type) and inspect.isclass(required_type):
-            return issubclass(provided_type, required_type)
-    except TypeError:
-        # issubclass can fail for some types (e.g., generics)
-        pass
-
-    # Exact type match
-    if provided_type == required_type:
-        return True
+    if inspect.isclass(provided_type) and inspect.isclass(required_type):
+        return issubclass(provided_type, required_type)
 
     # For other complex types (generics, unions, etc.), be conservative
     # and allow them through - full type checking would require more

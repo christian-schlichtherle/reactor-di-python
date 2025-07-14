@@ -75,6 +75,8 @@ This is a **code generator** for dependency injection, not a runtime DI framewor
 - **Framework**: pytest with pytest-cov
 - **Matrix Testing**: Python 3.8, 3.9, 3.10, 3.11, 3.12, 3.13
 - **Coverage Reports**: HTML, XML, and terminal output
+- **Value Test Coverage**: Prioritize value test coverage over test disjunctiveness
+- Value test assertions over test coverage
 
 ## CI/CD Pipeline
 
