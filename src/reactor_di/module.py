@@ -1,4 +1,4 @@
-"""Reactor DI - Type-safe dependency injection through controlled component composition.
+"""Module decorator for type-safe dependency injection through controlled component composition.
 
 This module provides the @module decorator that acts like a chemical reactor, composing
 working applications from abstract component ingredients through controlled reactions.
@@ -9,7 +9,7 @@ Like a chemical reactor, the module provides controlled conditions where:
 3. Complete working implementations are synthesized on-demand
 4. Full inheritance hierarchy is searched for dependencies and abstract attributes
 
-The decorator now supports concrete classes with unimplemented dependencies, not just
+The decorator supports concrete classes with unimplemented dependencies, not just
 abstract base classes. It uses get_all_type_hints() and systematic MRO traversal
 to discover dependencies and abstract attributes from the entire inheritance chain.
 
@@ -38,29 +38,16 @@ Example usage:
 """
 
 import inspect
-from enum import Enum
 from functools import cached_property
 from typing import Any, Callable, Set, Union
 
+from .caching import CachingStrategy
 from .type_utils import (
-    _is_type_compatible,
+    is_type_compatible,
     safe_get_type_hints,
     get_all_type_hints,
     needs_implementation,
 )
-
-
-class CachingStrategy(Enum):
-    """Caching strategy for component synthesis in the dependency injection system.
-
-    Determines how component instances are cached and reused within the module.
-    """
-
-    DISABLED = "disabled"
-    """No caching - components are created fresh on each access."""
-
-    NOT_THREAD_SAFE = "not_thread_safe"
-    """Cache components using @cached_property (not thread-safe but performant)."""
 
 
 def _needs_synthesis(cls: Any) -> bool:
@@ -132,7 +119,7 @@ def _validate_component_dependencies(module_cls: type, component_type: type) -> 
         # Check type compatibility if module has type annotation
         if module_attr_name in module_annotations:
             provided_type = module_annotations[module_attr_name]
-            if not _is_type_compatible(provided_type, dep_type):
+            if not is_type_compatible(provided_type, dep_type):
                 raise TypeError(
                     f"{component_type.__name__} requires '{dep_name}: {dep_type}' "
                     f"but {module_cls.__name__}.{module_attr_name} provides '{provided_type}'. "

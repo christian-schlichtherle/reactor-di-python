@@ -6,8 +6,9 @@ from abc import ABC
 
 import pytest
 
+from src.reactor_di.caching import CachingStrategy
 from src.reactor_di.law_of_demeter import law_of_demeter
-from src.reactor_di.reactor_di import CachingStrategy, module
+from src.reactor_di.module import module
 
 
 class TestDecoratorCooperation:

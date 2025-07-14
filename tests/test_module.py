@@ -1,4 +1,4 @@
-"""Comprehensive tests for reactor_di module to achieve 100% coverage."""
+"""Comprehensive tests for module decorator to achieve 100% coverage."""
 
 # type: ignore
 
@@ -8,24 +8,15 @@ from unittest.mock import patch
 
 import pytest
 
-from src.reactor_di.reactor_di import (
-    CachingStrategy,
+from src.reactor_di.caching import CachingStrategy
+from src.reactor_di.module import (
     _needs_synthesis,
-    _is_type_compatible,
     _validate_component_dependencies,
     _create_direct_factory_func,
     _create_bound_factory_func,
     module,
 )
-
-
-class TestCachingStrategy:
-    """Test CachingStrategy enum."""
-
-    def test_enum_values(self):
-        """Test enum has correct values."""
-        assert CachingStrategy.DISABLED.value == "disabled"
-        assert CachingStrategy.NOT_THREAD_SAFE.value == "not_thread_safe"
+from src.reactor_di.type_utils import is_type_compatible
 
 
 class TestNeedsSynthesis:
@@ -96,15 +87,15 @@ class TestNeedsSynthesis:
 
 
 class TestIsTypeCompatible:
-    """Test _is_type_compatible function."""
+    """Test is_type_compatible function."""
 
     def test_string_annotations_matching(self):
         """Test string type annotations that match."""
-        assert _is_type_compatible("MyClass", "MyClass")
+        assert is_type_compatible("MyClass", "MyClass")
 
     def test_string_annotations_not_matching(self):
         """Test string type annotations that don't match."""
-        assert not _is_type_compatible("ClassA", "ClassB")
+        assert not is_type_compatible("ClassA", "ClassB")
 
     def test_mixed_string_and_type(self):
         """Test mixed string and type annotations."""
@@ -113,14 +104,14 @@ class TestIsTypeCompatible:
             pass
 
         # Should do name-based comparison
-        assert _is_type_compatible("MyClass", MyClass)
-        assert _is_type_compatible(MyClass, "MyClass")
+        assert is_type_compatible("MyClass", MyClass)
+        assert is_type_compatible(MyClass, "MyClass")
 
     def test_none_types(self):
         """Test None type handling."""
-        assert _is_type_compatible(None, None)
-        assert not _is_type_compatible(None, str)
-        assert not _is_type_compatible(str, None)
+        assert is_type_compatible(None, None)
+        assert not is_type_compatible(None, str)
+        assert not is_type_compatible(str, None)
 
     def test_subclass_relationship(self):
         """Test subclass relationship checking."""
@@ -131,8 +122,8 @@ class TestIsTypeCompatible:
         class Child(Parent):
             pass
 
-        assert _is_type_compatible(Child, Parent)
-        assert not _is_type_compatible(Parent, Child)
+        assert is_type_compatible(Child, Parent)
+        assert not is_type_compatible(Parent, Child)
 
     def test_issubclass_type_error(self):
         """Test TypeError handling in issubclass."""
@@ -147,20 +138,20 @@ class TestIsTypeCompatible:
         # Make inspect.isclass return True for both
         with patch("inspect.isclass", return_value=True):
             # This should trigger the TypeError handling and fallback to conservative True
-            result = _is_type_compatible(mock_type, str)
+            result = is_type_compatible(mock_type, str)
             assert result is True
 
     def test_exact_type_match(self):
         """Test exact type matching."""
-        assert _is_type_compatible(str, str)
-        assert _is_type_compatible(int, int)
+        assert is_type_compatible(str, str)
+        assert is_type_compatible(int, int)
 
     def test_conservative_fallback(self):
         """Test conservative fallback for complex types."""
         from typing import Union
 
         # Complex types should fallback to True
-        assert _is_type_compatible(Union[str, int], Union[str, int])
+        assert is_type_compatible(Union[str, int], Union[str, int])
 
 
 class TestValidateComponentDependencies:

@@ -18,10 +18,10 @@ Key Features:
 - Natural inheritance support for complex class hierarchies
 - Auto-setup for stacked decorator patterns
 - Zero runtime introspection overhead
-- Seamless integration with @module decorator from reactor_di.py
+- Seamless integration with @module decorator from module.py
 
 Integration with Reactor DI:
-The @law_of_demeter decorator works seamlessly with @module from reactor_di.py.
+The @law_of_demeter decorator works seamlessly with @module from module.py.
 When @law_of_demeter creates forwarding properties, @module recognizes them as
 implemented dependencies during validation, enabling clean cooperation between
 decorators without any special configuration.
@@ -46,7 +46,7 @@ from functools import wraps
 from typing import Any, Callable, Type, get_type_hints
 
 from .type_utils import (
-    _is_type_compatible,
+    is_type_compatible,
     safe_get_type_hints,
     get_all_type_hints,
     needs_implementation,
@@ -114,7 +114,7 @@ def _can_resolve_annotation(
     # Type compatibility check
     if has_annotation:
         target_member_type = target_annotations[target_attr_name]
-        if not _is_type_compatible(target_member_type, source_type):
+        if not is_type_compatible(target_member_type, source_type):
             raise TypeError(
                 f"Cannot forward {base_ref}.{target_attr_name}: {target_member_type} "
                 f"to {cls.__name__}.{target_attr_name}: {source_type} - types incompatible"
@@ -123,7 +123,7 @@ def _can_resolve_annotation(
     return True
 
 
-def should_handle_annotation(annotated_name: str, prefix: str) -> bool:
+def _should_handle_annotation(annotated_name: str, prefix: str) -> bool:
     """Check if this decorator instance should handle the given annotation.
 
     Args:
@@ -324,7 +324,7 @@ def law_of_demeter(
 
         for annotated_name, annotated_type in annotations.items():
             # Check if this decorator instance should handle this annotation
-            if not should_handle_annotation(annotated_name, prefix):
+            if not _should_handle_annotation(annotated_name, prefix):
                 continue
 
             # Only implement annotations that need implementation

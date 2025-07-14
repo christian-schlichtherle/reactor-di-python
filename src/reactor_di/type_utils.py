@@ -9,7 +9,7 @@ Key Functions:
 - get_all_type_hints(): Collects type hints from entire inheritance hierarchy
 - safe_get_type_hints(): Safely retrieves type hints with fallback to annotations
 - needs_implementation(): Checks if an attribute needs implementation (searches full MRO for abstract attributes)
-- _is_type_compatible(): Validates type compatibility for dependency injection
+- is_type_compatible(): Validates type compatibility for dependency injection
 
 The functions systematically search the Method Resolution Order (MRO) to find
 annotations and abstract attributes from the entire class hierarchy, ensuring
@@ -20,7 +20,7 @@ import inspect
 from typing import Any, Type, get_type_hints
 
 
-def _is_type_compatible(provided_type: Any, required_type: Any) -> bool:
+def is_type_compatible(provided_type: Any, required_type: Any) -> bool:
     """Check if provided ingredient type is compatible with required ingredient type.
 
     Args:
