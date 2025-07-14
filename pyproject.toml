@@ -61,14 +61,14 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 addopts = [
-    "--strict-markers",
-    "--strict-config",
-    "--verbose",
-    "--cov=reactor_di",
+    "--cov=src",
+    "--cov-fail-under=90",
     "--cov-report=term-missing",
     "--cov-report=html:coverage_html",
     "--cov-report=xml:coverage.xml",
-    "--cov-fail-under=90",
+    "--strict-config",
+    "--strict-markers",
+    "--verbose",
 ]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
@@ -76,7 +76,7 @@ markers = [
 ]
 
 [tool.coverage.run]
-source = ["src/reactor_di"]
+source = ["src"]
 branch = true
 omit = [
     "*/tests/*",
