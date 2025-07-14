@@ -21,7 +21,7 @@ from typing import Protocol, runtime_checkable
 
 import pytest
 
-from src.reactor_di.law_of_demeter import law_of_demeter, CachingStrategy
+from src.reactor_di.law_of_demeter import law_of_demeter
 
 
 # =============================================================================
@@ -694,283 +694,8 @@ class TestLawOfDemeterAttributeForwarding:
 
 
 # =============================================================================
-# Caching Strategy Tests
+# Additional Annotation-Driven Tests
 # =============================================================================
-
-
-class TestCachingStrategyNever:
-    """Test NEVER caching strategy - no caching (default behavior)."""
-
-    def test_never_strategy_basic_forwarding(self):
-        """Test that NEVER strategy creates regular properties only."""
-
-        call_counts = {"timeout": 0, "expensive": 0}
-
-        class Config:
-            @property
-            def timeout(self) -> int:
-                call_counts["timeout"] += 1
-                return 300
-
-            @cached_property
-            def expensive_computation(self) -> str:
-                call_counts["expensive"] += 1
-                return "expensive_result"
-
-        @law_of_demeter("config", cache=CachingStrategy.NEVER)
-        class Controller:
-            def __init__(self, config):
-                self.config = config
-
-            _timeout: int
-            _expensive_computation: str
-
-        config = Config()
-        controller = Controller(config)
-
-        # All forwarded properties should be regular properties
-        assert isinstance(getattr(Controller, "_timeout"), property)
-        assert isinstance(getattr(Controller, "_expensive_computation"), property)
-        assert not isinstance(getattr(Controller, "_timeout"), cached_property)
-        assert not isinstance(
-            getattr(Controller, "_expensive_computation"), cached_property
-        )
-
-        # Test that properties are called each time (no caching)
-        result1 = controller._timeout
-        assert result1 == 300
-        assert call_counts["timeout"] == 1
-
-        result2 = controller._timeout
-        assert result2 == 300
-        assert call_counts["timeout"] == 2  # Called again (not cached)
-
-        # Even with NEVER strategy, the base object's caching behavior is preserved
-        # (NEVER only affects the forwarding property type, not the base behavior)
-        expensive1 = controller._expensive_computation
-        assert expensive1 == "expensive_result"
-        assert call_counts["expensive"] == 1
-
-        expensive2 = controller._expensive_computation
-        assert expensive2 == "expensive_result"
-        assert (
-            call_counts["expensive"] == 1
-        )  # Base is still cached (we only control forwarding type)
-
-    def test_never_strategy_with_inheritance(self):
-        """Test NEVER strategy works correctly with inheritance."""
-
-        @law_of_demeter("config", cache=CachingStrategy.NEVER)
-        class BaseController:
-            def __init__(self, config):
-                self.config = config
-
-            _timeout: int
-
-        class ChildController(BaseController):
-            """Child inherits NEVER strategy behavior."""
-
-            pass
-
-        config = MockConfig()
-        child = ChildController(config)
-
-        # Child should inherit regular property from parent
-        assert hasattr(child, "_timeout")
-        assert isinstance(getattr(type(child), "_timeout"), property)
-        assert not isinstance(getattr(type(child), "_timeout"), cached_property)
-
-        assert child._timeout == 300
-
-
-class TestCachingStrategyPreserve:
-    """Test PRESERVE caching strategy - selective caching based on base property type."""
-
-    def test_preserve_strategy_mixed_properties(self):
-        """Test PRESERVE strategy preserves base property caching behavior."""
-
-        call_counts = {"regular": 0, "cached": 0}
-
-        class Config:
-            @property
-            def regular_prop(self) -> str:
-                call_counts["regular"] += 1
-                return "regular_result"
-
-            @cached_property
-            def cached_prop(self) -> str:
-                call_counts["cached"] += 1
-                return "cached_result"
-
-        @law_of_demeter("config", cache=CachingStrategy.PRESERVE)
-        class Controller:
-            def __init__(self, config):
-                self.config = config
-
-            _regular_prop: str
-            _cached_prop: str
-
-        config = Config()
-        controller = Controller(config)
-
-        # Test regular property behavior (not cached)
-        regular1 = controller._regular_prop
-        assert regular1 == "regular_result"
-        assert call_counts["regular"] == 1
-
-        regular2 = controller._regular_prop
-        assert regular2 == "regular_result"
-        assert call_counts["regular"] == 2  # Called again
-
-        # Test cached property behavior (cached)
-        cached1 = controller._cached_prop
-        assert cached1 == "cached_result"
-        assert call_counts["cached"] == 1
-
-        cached2 = controller._cached_prop
-        assert cached2 == "cached_result"
-        assert call_counts["cached"] == 1  # Not called again (cached)
-
-        # Verify property types were upgraded correctly
-        assert isinstance(getattr(Controller, "_cached_prop"), cached_property)
-        assert isinstance(getattr(Controller, "_regular_prop"), property)
-        assert not isinstance(getattr(Controller, "_regular_prop"), cached_property)
-
-    def test_preserve_strategy_runtime_upgrade(self):
-        """Test that PRESERVE strategy upgrades properties at runtime."""
-
-        class Config:
-            @cached_property
-            def runtime_cached(self) -> str:
-                return "runtime_result"
-
-        @law_of_demeter("config", cache=CachingStrategy.PRESERVE)
-        class Controller:
-            def __init__(self, config):
-                self.config = config
-
-            _runtime_cached: str
-
-        config = Config()
-        controller = Controller(config)
-
-        # Initially, the property should be regular
-        initial_prop = getattr(Controller, "_runtime_cached")
-        assert isinstance(initial_prop, property)
-
-        # First access should upgrade the property
-        result = controller._runtime_cached
-        assert result == "runtime_result"
-
-        # After access, property should be upgraded to cached_property
-        upgraded_prop = getattr(Controller, "_runtime_cached")
-        assert isinstance(upgraded_prop, cached_property)
-
-
-class TestCachingStrategyAlways:
-    """Test ALWAYS caching strategy - aggressive caching."""
-
-    def test_always_strategy_caches_everything(self):
-        """Test that ALWAYS strategy creates cached properties for everything."""
-
-        class Config:
-            @property
-            def regular_prop(self) -> str:
-                return "regular_result"
-
-            @cached_property
-            def already_cached(self) -> str:
-                return "cached_result"
-
-        @law_of_demeter("config", cache=CachingStrategy.ALWAYS)
-        class Controller:
-            def __init__(self, config):
-                self.config = config
-
-            _regular_prop: str
-            _already_cached: str
-
-        config = Config()
-        controller = Controller(config)
-
-        # Both properties should be cached_property
-        assert isinstance(getattr(Controller, "_regular_prop"), cached_property)
-        assert isinstance(getattr(Controller, "_already_cached"), cached_property)
-
-        # Test functionality
-        assert controller._regular_prop == "regular_result"
-        assert controller._already_cached == "cached_result"
-
-    def test_always_strategy_performance_benefit(self):
-        """Test performance benefit of ALWAYS strategy."""
-
-        call_count = 0
-
-        class Config:
-            @property
-            def expensive_prop(self) -> str:
-                nonlocal call_count
-                call_count += 1
-                return f"expensive_result_{call_count}"
-
-        @law_of_demeter("config", cache=CachingStrategy.ALWAYS)
-        class Controller:
-            def __init__(self, config):
-                self.config = config
-
-            _expensive_prop: str
-
-        config = Config()
-        controller = Controller(config)
-
-        # Multiple accesses should only call once due to caching
-        result1 = controller._expensive_prop
-        result2 = controller._expensive_prop
-        result3 = controller._expensive_prop
-
-        assert result1 == "expensive_result_1"
-        assert result2 == "expensive_result_1"  # Same result (cached)
-        assert result3 == "expensive_result_1"  # Same result (cached)
-        assert call_count == 1  # Only called once
-
-
-class TestCachingStrategiesMixed:
-    """Test mixed caching strategies and edge cases."""
-
-    def test_stacked_decorators_with_different_strategies(self):
-        """Test stacked decorators with different caching strategies."""
-
-        class Config:
-            @cached_property
-            def cached_prop(self) -> str:
-                return "cached_value"
-
-        class Module:
-            def __init__(self, config):
-                self.config = config
-                self.regular_prop = "regular_value"
-
-        @law_of_demeter("_config", cache=CachingStrategy.PRESERVE)
-        @law_of_demeter("_module", cache=CachingStrategy.ALWAYS)
-        class MixedStrategyController:
-            def __init__(self, module):
-                self._module = module
-
-            _cached_prop: str  # From _config with PRESERVE
-            _regular_prop: str  # From _module with ALWAYS
-
-        config = Config()
-        module = Module(config)
-        controller = MixedStrategyController(module)
-
-        # Test that both strategies work
-        assert controller._cached_prop == "cached_value"
-        assert controller._regular_prop == "regular_value"
-
-        # _regular_prop should be cached due to ALWAYS strategy
-        assert isinstance(
-            getattr(MixedStrategyController, "_regular_prop"), cached_property
-        )
 
 
 class TestLawOfDemeterAnnotationDriven:
@@ -1128,7 +853,7 @@ class TestLawOfDemeterAnnotationDriven:
             def cached_prop(self) -> str:
                 return "cached"
 
-        @law_of_demeter("config", cache=CachingStrategy.PRESERVE)
+        @law_of_demeter("config")
         class PreserveAnnotationController:
             def __init__(self, config):
                 self.config = config
@@ -1143,9 +868,9 @@ class TestLawOfDemeterAnnotationDriven:
         assert controller._regular_prop == "regular"
         assert controller._cached_prop == "cached"
 
-        # Test that cached property was preserved/upgraded
+        # All properties are now regular properties (caching removed)
         assert isinstance(
-            getattr(PreserveAnnotationController, "_cached_prop"), cached_property
+            getattr(PreserveAnnotationController, "_cached_prop"), property
         )
         assert isinstance(
             getattr(PreserveAnnotationController, "_regular_prop"), property
@@ -1199,7 +924,7 @@ class TestDecoratorEdgeCaseCoverage:
         class EmptyModule:
             pass
 
-        @law_of_demeter("_module", cache=CachingStrategy.PRESERVE)
+        @law_of_demeter("_module")
         class EmptyModuleController:
             def __init__(self):
                 self._module = EmptyModule()
@@ -1228,7 +953,7 @@ class TestDecoratorEdgeCaseCoverage:
             def cached_attr(self):
                 return "cached_result"
 
-        @law_of_demeter("_config", cache=CachingStrategy.PRESERVE)
+        @law_of_demeter("_config")
         @law_of_demeter("_module")
         class CachedFailController:
             def __init__(self):
@@ -1255,7 +980,7 @@ class TestDecoratorEdgeCaseCoverage:
             def regular_attr(self):
                 return "config_result"
 
-        @law_of_demeter("_config", cache=CachingStrategy.PRESERVE)
+        @law_of_demeter("_config")
         @law_of_demeter("_module")
         class RegularFailController:
             def __init__(self):
@@ -1287,7 +1012,7 @@ class TestDecoratorEdgeCaseCoverage:
             def mixed_attr(self):
                 return "config_cached_value"
 
-        @law_of_demeter("_config", cache=CachingStrategy.PRESERVE)
+        @law_of_demeter("_config")
         @law_of_demeter("_module")
         class ComprehensiveFailController:
             def __init__(self):
@@ -1305,29 +1030,6 @@ class TestDecoratorEdgeCaseCoverage:
         # Second access should still work (cached)
         result2 = controller._mixed_attr
         assert result2 == "config_cached_value"
-
-    def test_unreachable_match_case_coverage(self):
-        """Test unreachable match/case coverage by testing all cache strategies."""
-
-        # Test all three caching strategies to ensure complete coverage
-        strategies = [
-            CachingStrategy.NEVER,
-            CachingStrategy.PRESERVE,
-            CachingStrategy.ALWAYS,
-        ]
-
-        for strategy in strategies:
-
-            @law_of_demeter("config", cache=strategy)
-            class TestController:
-                def __init__(self, config):
-                    self.config = config
-
-                _timeout: int
-
-            config = MockConfig()
-            controller = TestController(config)
-            assert controller._timeout == 300
 
     def test_very_specific_exception_paths(self):
         """Test very specific exception paths for maximum coverage."""
@@ -1348,17 +1050,17 @@ class TestDecoratorEdgeCaseCoverage:
         assert controller._timeout == 300
 
     def test_cached_property_upgrade_paths(self):
-        """Test cached property upgrade paths in PRESERVE strategy."""
+        """Test property forwarding works correctly (caching removed)."""
 
-        upgrade_log = []
+        access_log = []
 
         class TrackingConfig:
             @cached_property
             def tracked_prop(self):
-                upgrade_log.append("cached_prop_accessed")
+                access_log.append("cached_prop_accessed")
                 return "tracked_value"
 
-        @law_of_demeter("config", cache=CachingStrategy.PRESERVE)
+        @law_of_demeter("config")
         class UpgradeController:
             def __init__(self, config):
                 self.config = config
@@ -1368,14 +1070,14 @@ class TestDecoratorEdgeCaseCoverage:
         config = TrackingConfig()
         controller = UpgradeController(config)
 
-        # First access should trigger upgrade and access
+        # Access should work and forward to base property
         result = controller._tracked_prop
         assert result == "tracked_value"
-        assert "cached_prop_accessed" in upgrade_log
+        assert "cached_prop_accessed" in access_log
 
-        # Verify property was upgraded
+        # All properties are now regular properties
         prop = getattr(UpgradeController, "_tracked_prop")
-        assert isinstance(prop, cached_property)
+        assert isinstance(prop, property)
 
 
 # =============================================================================
@@ -1389,22 +1091,23 @@ class TestMissingCoverageLines:
     def test_init_method_exception_in_annotation_resolution(self):
         """Test lines 54-55: Exception in __init__ method type hints resolution."""
 
-        # Mock the safe_get_type_hints to force an exception on __init__
+        # Mock get_type_hints to force an exception
         import src.reactor_di.law_of_demeter as lod_module
+        from typing import get_type_hints
 
-        original_safe_get_type_hints = lod_module.safe_get_type_hints
+        original_get_type_hints = get_type_hints
 
-        def mock_safe_get_type_hints(cls):
-            if hasattr(cls, "__init__") and cls.__name__ == "TestController":
-                # First call (for class annotations) should work
-                return {"config": object, "_some_attr": str}
-            elif hasattr(cls, "__init__"):
-                # Second call (for __init__ annotations) should raise exception
+        def mock_get_type_hints(obj, globalns=None, localns=None):
+            if hasattr(obj, "__name__") and "TestController" in str(obj):
+                # Trigger exception for __init__ method
                 raise NameError("Simulated exception in __init__ type hints")
-            return original_safe_get_type_hints(cls)
+            return original_get_type_hints(obj, globalns, localns)
 
         # Temporarily replace the function
-        lod_module.safe_get_type_hints = mock_safe_get_type_hints
+        import typing
+
+        typing.get_type_hints = mock_get_type_hints
+        lod_module.get_type_hints = mock_get_type_hints
 
         try:
 
@@ -1420,7 +1123,8 @@ class TestMissingCoverageLines:
             assert hasattr(TestController, "_some_attr")
         finally:
             # Restore original function
-            lod_module.safe_get_type_hints = original_safe_get_type_hints
+            typing.get_type_hints = original_get_type_hints
+            lod_module.get_type_hints = original_get_type_hints
 
     def test_private_target_attribute_line_69(self):
         """Test line 69: Return False for private target attributes."""
@@ -1536,7 +1240,7 @@ class TestMissingCoverageLines:
             def cached_attr(self):
                 return "cached_value"
 
-        @law_of_demeter("_config", cache=CachingStrategy.PRESERVE)
+        @law_of_demeter("_config")
         @law_of_demeter("_module")
         class PreserveController:
             def __init__(self, module, config):
@@ -1559,7 +1263,7 @@ class TestMissingCoverageLines:
             pass
 
         # Create a scenario where all decorators fail and base_obj ends up None
-        @law_of_demeter("_module", cache=CachingStrategy.PRESERVE)
+        @law_of_demeter("_module")
         class ControllerWithEmptyBase:
             def __init__(self, module):
                 self._module = module
@@ -1594,7 +1298,7 @@ class TestMissingCoverageLines:
             def expensive_prop(self):
                 return "expensive_cached_value"
 
-        @law_of_demeter("_config", cache=CachingStrategy.PRESERVE)
+        @law_of_demeter("_config")
         @law_of_demeter("_module")
         class CachedController:
             def __init__(self, module, config):
@@ -1635,7 +1339,7 @@ class TestMissingCoverageLines:
             def regular_attr(self):
                 return "config_regular_result"
 
-        @law_of_demeter("_config", cache=CachingStrategy.PRESERVE)
+        @law_of_demeter("_config")
         @law_of_demeter("_module")
         class RegularController:
             def __init__(self, module, config):
@@ -1739,31 +1443,29 @@ class TestMissingCoverageLines:
         # _config should not be set automatically in this case
         # We can't easily test this because the auto-setup logic is complex
 
-    def test_preserve_strategy_checked_props_initialization(self):
-        """Test initialization of _law_of_demeter_checked_props set."""
+    def test_basic_property_forwarding_functionality(self):
+        """Test basic property forwarding functionality (caching logic removed)."""
 
         class ConfigWithCached:
             @cached_property
             def expensive_calc(self):
                 return "expensive_result"
 
-        @law_of_demeter("config", cache=CachingStrategy.PRESERVE)
-        class CheckedPropsController:
+        @law_of_demeter("config")
+        class BasicController:
             def __init__(self):
                 self.config = ConfigWithCached()
 
             _expensive_calc: str
 
-        controller = CheckedPropsController()
+        controller = BasicController()
 
-        # First access should initialize the checked props set
+        # Access should work and forward to base property
         result = controller._expensive_calc
         assert result == "expensive_result"
 
-        # Verify the checked props set was created
-        assert hasattr(type(controller), "_law_of_demeter_checked_props")
-        assert isinstance(type(controller)._law_of_demeter_checked_props, set)
-        assert "_expensive_calc" in type(controller)._law_of_demeter_checked_props
+        # No checked props set needed anymore (caching removed)
+        assert not hasattr(type(controller), "_law_of_demeter_checked_props")
 
     def test_coverage_specific_lines(self):
         """Test very specific lines that are hard to reach through normal usage."""
@@ -1797,17 +1499,17 @@ class TestMissingCoverageLines:
         assert hasattr(EmptyPrefixController, "timeout")
         assert not hasattr(EmptyPrefixController, "_private")
 
-        # Test line 331 - CachingStrategy.ALWAYS branch
-        @law_of_demeter("config", cache=CachingStrategy.ALWAYS)
+        # Test basic functionality
+        @law_of_demeter("config")
         class AlwaysCacheController:
             def __init__(self):
                 self.config = ConfigType()
 
             _timeout: int
 
-        # Should create cached_property
+        # Should create regular property (caching removed)
         prop = getattr(AlwaysCacheController, "_timeout")
-        assert isinstance(prop, cached_property)
+        assert isinstance(prop, property)
 
         # Test line 472 - skip logic for decorator name conflicts
         @law_of_demeter("_config")
@@ -1828,17 +1530,17 @@ class TestMissingCoverageLines:
         assert "_module" in decorators
 
         # Test line 484 - cached_property __set_name__ call
-        @law_of_demeter("config", cache=CachingStrategy.ALWAYS)
+        @law_of_demeter("config")
         class SetNameController:
             def __init__(self):
                 self.config = ConfigType()
 
             _timeout: int
 
-        # Verify __set_name__ was called on the cached_property
+        # Verify property is working correctly (no __set_name__ needed for regular properties)
         prop = getattr(SetNameController, "_timeout")
-        assert isinstance(prop, cached_property)
-        # If __set_name__ wasn't called, the property wouldn't work correctly
+        assert isinstance(prop, property)
+        # Property should work correctly
 
 
 # =============================================================================
@@ -1905,7 +1607,7 @@ class TestFinalCoverageLines:
             def regular_working(self):
                 return "regular_works"
 
-        @law_of_demeter("_config", cache=CachingStrategy.PRESERVE)
+        @law_of_demeter("_config")
         @law_of_demeter("_module")
         class ComplexEdgeCaseController:
             def __init__(self):

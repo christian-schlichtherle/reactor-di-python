@@ -9,12 +9,11 @@ ensuring that only explicitly declared attributes are forwarded from a base refe
 It searches the entire inheritance hierarchy (MRO) for annotations and abstract attributes,
 enabling proper support for complex class hierarchies.
 
-Requires Python 3.8+ (uses functools.cached_property)
+Requires Python 3.8+
 
 Key Features:
 - Explicit annotation-driven property forwarding
 - Full inheritance hierarchy (MRO) search for annotations and abstract attributes
-- Three caching strategies (NEVER, PRESERVE, ALWAYS)
 - Type-safe validation with compatibility checking
 - Natural inheritance support for complex class hierarchies
 - Auto-setup for stacked decorator patterns
@@ -43,8 +42,7 @@ Example:
 For detailed usage examples and advanced patterns, see the law_of_demeter function docstring.
 """
 
-from enum import Enum
-from functools import cached_property, wraps
+from functools import wraps
 from typing import Any, Callable, Type, Union, get_type_hints
 
 from .type_utils import (
@@ -53,19 +51,6 @@ from .type_utils import (
     get_all_type_hints,
     needs_implementation,
 )
-
-
-class CachingStrategy(Enum):
-    """Caching strategy for law_of_demeter decorator.
-
-    NEVER: Don't cache any decorated attributes and properties (default).
-    PRESERVE: Cache only properties that are decorated with @cached_property.
-    ALWAYS: Cache all decorated attributes and properties.
-    """
-
-    NEVER = "never"
-    PRESERVE = "preserve"
-    ALWAYS = "always"
 
 
 def _can_resolve_annotation(
@@ -160,7 +145,6 @@ def law_of_demeter(
     base_ref: str,
     *,
     prefix: str = "_",
-    cache: CachingStrategy = CachingStrategy.NEVER,
 ) -> Callable[[Type[Any]], Type[Any]]:
     """
     Class decorator that creates forwarding properties for explicitly annotated
@@ -176,10 +160,6 @@ def law_of_demeter(
     Args:
         base_ref: Name of the attribute/reference to forward from
         prefix: Prefix to add to forwarded property names (default: '_')
-        cache: Caching strategy for forwarded properties (default: CachingStrategy.NEVER)
-               - NEVER: Don't cache any decorated attributes and properties
-               - PRESERVE: Cache only properties decorated with @cached_property
-               - ALWAYS: Cache all decorated attributes and properties
 
     Basic Usage:
         @law_of_demeter('config')
@@ -250,14 +230,6 @@ def law_of_demeter(
             _timeout: int      # Forwards Pydantic field
             _is_dry_run: bool  # Forwards Pydantic field
 
-        # Preserve cached properties
-        @law_of_demeter('config', preserve_cached=True)
-        class CachedController:
-            def __init__(self, config):
-                self.config = config
-
-            _computed_value: str  # Remains cached if config.computed_value is cached
-
     Type Safety & IDE Support:
         The explicit annotations provide excellent IDE autocomplete and type checking:
 
@@ -282,39 +254,6 @@ def law_of_demeter(
 
         This eliminates manual setup while maintaining clean separation of concerns.
 
-    Caching Strategies:
-        The decorator supports three caching strategies via the cache parameter:
-
-        # NEVER (default) - No caching, minimal overhead
-        @law_of_demeter("config", cache=CachingStrategy.NEVER)
-        class BasicController:
-            def __init__(self, config):
-                self.config = config
-
-            _timeout: int        # Regular property forwarding
-            _is_dry_run: bool    # Regular property forwarding
-
-        # PRESERVE - Smart caching, preserves base property behavior
-        @law_of_demeter("config", cache=CachingStrategy.PRESERVE)
-        class SmartController:
-            def __init__(self, config):
-                self.config = config
-
-            _expensive_computation: str  # Becomes cached_property if base is cached
-            _simple_prop: str           # Remains regular property if base is regular
-
-        # ALWAYS - Aggressive caching, all properties become cached
-        @law_of_demeter("config", cache=CachingStrategy.ALWAYS)
-        class PerformanceController:
-            def __init__(self, config):
-                self.config = config
-
-            _timeout: int        # Cached even if config.timeout is regular property
-            _is_dry_run: bool    # Cached even if config.is_dry_run is regular property
-
-        PRESERVE strategy detects base property types at runtime and upgrades
-        forwarding properties to match. ALWAYS strategy provides maximum performance
-        by caching everything regardless of base property type.
 
     Side Effect Guarantees:
         - Zero property calls during object initialization
@@ -322,7 +261,6 @@ def law_of_demeter(
         - Exact call chain: controller._prop → controller._module.config.prop
         - No side effects during introspection or inheritance
         - Child classes inherit with zero overhead
-        - Cached properties called exactly once (when cached)
 
     Performance & Benefits:
         - Lightning-fast object creation - properties created at decoration time
@@ -331,21 +269,18 @@ def law_of_demeter(
         - Explicit declaration prevents surprise attribute forwarding
         - Clean child classes - no repeated annotations needed
         - Optimal call chains - direct forwarding with minimal overhead
-        - Smart caching - preserves performance characteristics of base properties
 
     Forwarding Scope:
         - Only forwards explicitly annotated attributes
-        - Supports @property, @cached_property, and instance attributes (Pydantic fields)
-        - Properties are created at class decoration time with smart runtime optimization
+        - Supports @property and instance attributes (Pydantic fields)
+        - Properties are created at class decoration time
         - Child classes inherit properties via normal Python inheritance
         - Stacked decorators automatically resolve to the correct base object
     """
 
     def decorator(cls: Type[Any]) -> Type[Any]:
 
-        def create_forwarding_property(
-            attr_name: str, cache_strategy: CachingStrategy
-        ) -> Union[property, cached_property[Any]]:
+        def create_forwarding_property(attr_name: str) -> property:
             """Create a forwarding property for a given attribute name."""
 
             def getter(self: Any) -> Any:
@@ -375,120 +310,8 @@ def law_of_demeter(
             getter.__doc__ = f"Forwarded property from {base_ref}.{attr_name}"
             getter.__name__ = prefix + attr_name
 
-            # Use if/elif statements to implement different caching strategies (Python 3.8+ compatible)
-            if cache_strategy == CachingStrategy.ALWAYS:
-                # Aggressive caching - all properties become cached
-                return cached_property(getter)
-            elif cache_strategy == CachingStrategy.PRESERVE:
-                # Smart caching - preserve base property behavior
-                def smart_getter(self: Any) -> Any:
-                    # Check if we need to upgrade this property to cached_property
-                    prop_name = prefix + attr_name
-                    current_prop = getattr(type(self), prop_name)
-
-                    # Only do this check once - if already upgraded, just forward
-                    checked_props: set[str] = getattr(
-                        type(self), "_law_of_demeter_checked_props", set()
-                    )
-                    if prop_name not in checked_props:
-                        # Find the base object and check if the base property is cached
-                        base_obj = None
-                        decorators = getattr(
-                            self.__class__,
-                            "__law_of_demeter_decorators__",
-                            [base_ref],
-                        )
-
-                        for base_attr_candidate in decorators:
-                            try:
-                                base_obj = getattr(self, base_attr_candidate)
-                                base_class = type(base_obj)
-                                if hasattr(base_class, attr_name) or (
-                                    hasattr(base_obj, "__dict__")
-                                    and attr_name in base_obj.__dict__
-                                ):
-                                    break
-                            except AttributeError:
-                                continue
-
-                        if base_obj is None:
-                            base_obj = getattr(self, base_ref)
-
-                        base_class = type(base_obj)
-                        base_descriptor = getattr(base_class, attr_name, None)
-
-                        # If base property is cached, upgrade our property to cached
-                        if isinstance(base_descriptor, cached_property):
-
-                            def cached_forwarding_getter(instance: Any) -> Any:
-                                # Find base object again at runtime
-                                for base_attr_candidate in decorators:
-                                    try:
-                                        base_obj = getattr(
-                                            instance, base_attr_candidate
-                                        )
-                                        base_class = type(base_obj)
-                                        if hasattr(base_class, attr_name) or (
-                                            hasattr(base_obj, "__dict__")
-                                            and attr_name in base_obj.__dict__
-                                        ):
-                                            return getattr(base_obj, attr_name)
-                                    except AttributeError:
-                                        continue
-                                base_obj = getattr(instance, base_ref)
-                                return getattr(base_obj, attr_name)
-
-                            # Replace the property with a cached version
-                            cached_prop = cached_property(cached_forwarding_getter)
-                            cached_prop.__set_name__(type(self), prop_name)
-                            setattr(type(self), prop_name, cached_prop)
-
-                            # Mark as checked
-                            if not hasattr(type(self), "_law_of_demeter_checked_props"):
-                                setattr(
-                                    type(self),
-                                    "_law_of_demeter_checked_props",
-                                    set(),
-                                )
-                            type(self)._law_of_demeter_checked_props.add(prop_name)
-
-                            # Now call the cached property
-                            return getattr(self, prop_name)
-                        else:
-                            # Mark as checked so we don't do this again
-                            if not hasattr(type(self), "_law_of_demeter_checked_props"):
-                                setattr(
-                                    type(self),
-                                    "_law_of_demeter_checked_props",
-                                    set(),
-                                )
-                            type(self)._law_of_demeter_checked_props.add(prop_name)
-
-                    # Regular forwarding (for non-cached or already-checked properties)
-                    decorators = getattr(
-                        self.__class__, "__law_of_demeter_decorators__", [base_ref]
-                    )
-
-                    for base_attr_candidate in decorators:
-                        try:
-                            base_obj = getattr(self, base_attr_candidate)
-                            base_class = type(base_obj)
-                            if hasattr(base_class, attr_name) or (
-                                hasattr(base_obj, "__dict__")
-                                and attr_name in base_obj.__dict__
-                            ):
-                                return getattr(base_obj, attr_name)
-                        except AttributeError:
-                            continue
-
-                    base_obj = getattr(self, base_ref)
-                    return getattr(base_obj, attr_name)
-
-                return property(smart_getter)
-            else:
-                # Default case for CachingStrategy.NEVER and any other values
-                # No caching - simple property forwarding (default behaviour)
-                return property(getter)
+            # Simple property forwarding
+            return property(getter)
 
         # Create properties immediately at decoration time based on annotations
         # Use get_all_type_hints to include annotations from superclasses
@@ -525,13 +348,9 @@ def law_of_demeter(
             ):
                 continue  # Skip this annotation, let other decorators handle it
 
-            # Create the forwarding property with the specified caching strategy
-            prop = create_forwarding_property(target_attr_name, cache)
+            # Create the forwarding property
+            prop = create_forwarding_property(target_attr_name)
             setattr(cls, annotated_name, prop)
-
-            # Set name for cached_property if needed
-            if isinstance(prop, cached_property):
-                prop.__set_name__(cls, annotated_name)
 
         # Auto-setup for stacked decorators (e.g., _config = _module.config)
         def setup_stacked_decorators() -> None:
