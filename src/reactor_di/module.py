@@ -289,7 +289,7 @@ def module(
                 factory_func = _create_direct_factory_func(attr_name, actual_type)
 
             # Apply caching strategy at decoration time
-            prop: Union[property, cached_property]
+            prop: Union[property, cached_property[Any]]
             if strategy == CachingStrategy.DISABLED:
                 prop = property(factory_func)
             else:  # CachingStrategy.NOT_THREAD_SAFE

@@ -22,7 +22,7 @@ removed in favor of letting real errors propagate for proper debugging.
 """
 
 import inspect
-from typing import Any, Type, get_type_hints
+from typing import Any, Dict, Type, get_type_hints
 
 
 def is_type_compatible(*, provided_type: Any, required_type: Any) -> bool:
@@ -60,7 +60,7 @@ def is_type_compatible(*, provided_type: Any, required_type: Any) -> bool:
     return True
 
 
-def safe_get_type_hints(cls: Type[Any]) -> dict[str, Any]:
+def safe_get_type_hints(cls: Type[Any]) -> Dict[str, Any]:
     """Safely get type hints, falling back to __annotations__ if needed.
 
     Args:
@@ -75,7 +75,7 @@ def safe_get_type_hints(cls: Type[Any]) -> dict[str, Any]:
         return getattr(cls, "__annotations__", {})
 
 
-def get_all_type_hints(cls: Type[Any]) -> dict[str, Any]:
+def get_all_type_hints(cls: Type[Any]) -> Dict[str, Any]:
     """Get type hints from a class and all its superclasses.
 
     Walks the MRO (Method Resolution Order) to collect all type hints,
