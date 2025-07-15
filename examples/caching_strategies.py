@@ -5,7 +5,7 @@ This example demonstrates the different caching strategies available:
 - CachingStrategy.NOT_THREAD_SAFE: Cached components (same instance returned)
 """
 
-from reactor_di import module, CachingStrategy
+from reactor_di import CachingStrategy, module
 
 
 class MyService:

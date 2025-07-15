@@ -237,7 +237,7 @@ This project uses modern Python tooling and best practices:
 ### Running Tests
 
 ```bash
-# Run all tests (126 tests, 100% coverage)
+# Run all tests (146 tests, 100% coverage)
 uv run pytest
 
 # Run tests with coverage reporting
@@ -248,20 +248,21 @@ uv run pytest tests/test_module.py          # Module decorator tests
 uv run pytest tests/test_law_of_demeter.py  # Law of Demeter decorator tests  
 uv run pytest tests/test_type_utils.py      # Type compatibility utilities tests
 uv run pytest tests/test_integration.py     # Integration tests between decorators
+uv run pytest examples/                     # Run all examples as tests
 ```
 
 ### Code Quality
 
 ```bash
 # Run linting
-uv run ruff check src tests
-uv run black --check src tests
+uv run ruff check src tests examples
+uv run black --check src tests examples
 
 # Run type checking
 uv run mypy src
 
 # Fix formatting
-uv run black src tests
+uv run black src tests examples
 ```
 
 ## Contributing

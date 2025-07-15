@@ -21,15 +21,16 @@ A code generator for dependency injection (DI) in Python based on the mediator a
 - `uv remove <package>` - Remove a dependency
 
 ### Testing
-- `uv run pytest` - Run all tests with coverage
+- `uv run pytest` - Run all tests with coverage (146 tests including examples)
 - `uv run pytest --cov=reactor_di` - Run tests with coverage reporting
 - `uv run pytest tests/test_module.py` - Run specific test file
+- `uv run pytest examples/` - Run testable examples
 - `uv run pytest -m "not slow"` - Skip slow tests
 
 ### Code Quality
-- `uv run ruff check src tests` - Run linting
-- `uv run black --check src tests` - Check code formatting
-- `uv run black src tests` - Format code
+- `uv run ruff check src tests examples` - Run linting
+- `uv run black --check src tests examples` - Check code formatting
+- `uv run black src tests examples` - Format code
 - `uv run mypy src` - Run type checking
 
 ### Building and Publishing
@@ -52,6 +53,12 @@ reactor-di-python/
 │   ├── test_law_of_demeter.py  # Tests for @law_of_demeter decorator  
 │   ├── test_type_utils.py      # Tests for type compatibility utilities
 │   └── test_integration.py     # Integration tests between decorators
+├── examples/                   # Testable examples (19 additional tests)
+│   ├── __init__.py             # Package initialization
+│   ├── quick_start.py          # Quick Start example as tests
+│   ├── caching_strategies.py   # Caching strategy examples
+│   ├── multiple_decorators.py  # Multiple decorator examples
+│   └── custom_prefixes.py      # Custom prefix examples
 ├── docs/                       # Documentation
 ├── .github/workflows/          # CI/CD pipelines
 │   ├── ci.yml                 # Matrix testing across Python versions
@@ -89,8 +96,8 @@ This is a **code generator** for dependency injection, not a runtime DI framewor
 ## Development Workflow
 
 1. Make changes in `src/reactor_di/`
-2. Add/update tests in `tests/`
-3. Run quality checks: `uv run pytest && uv run ruff check src tests && uv run mypy src`
+2. Add/update tests in `tests/` and examples in `examples/`
+3. Run quality checks: `uv run pytest && uv run ruff check src tests examples && uv run mypy src`
 4. Update documentation if needed
 5. Commit and push (CI will validate)
 

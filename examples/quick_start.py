@@ -6,7 +6,7 @@ This example demonstrates the core functionality of reactor-di:
 - Automatic dependency resolution and caching
 """
 
-from reactor_di import module, law_of_demeter, CachingStrategy
+from reactor_di import CachingStrategy, law_of_demeter, module
 
 
 class DatabaseConfig:
