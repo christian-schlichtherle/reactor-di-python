@@ -56,9 +56,9 @@ reactor-di-python/
 ├── examples/                   # Testable examples (19 additional tests)
 │   ├── __init__.py             # Package initialization
 │   ├── quick_start.py          # Quick Start example as tests
-│   ├── caching_strategies.py   # Caching strategy examples
+│   ├── caching_strategy.py     # Caching strategy examples
 │   ├── multiple_decorators.py  # Multiple decorator examples
-│   └── custom_prefixes.py      # Custom prefix examples
+│   └── custom_prefix.py        # Custom prefix examples
 ├── .github/workflows/          # CI/CD pipelines
 │   ├── ci.yaml                 # Matrix testing across Python versions
 │   └── publish.yaml            # PyPI deployment

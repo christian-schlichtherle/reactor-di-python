@@ -64,9 +64,9 @@ print(db_service._timeout)   # → 30 (from config.timeout)
 The `examples/` directory contains testable examples that demonstrate all the features shown in this README:
 
 - **`quick_start.py`** - The complete Quick Start example above, converted to testable format
-- **`caching_strategies.py`** - Demonstrates `CachingStrategy.DISABLED` vs `CachingStrategy.NOT_THREAD_SAFE`
+- **`caching_strategy.py`** - Demonstrates `CachingStrategy.DISABLED` vs `CachingStrategy.NOT_THREAD_SAFE`
 - **`multiple_decorators.py`** - Shows using multiple `@law_of_demeter` decorators on the same class
-- **`custom_prefixes.py`** - Demonstrates custom prefix options (`prefix=''`, `prefix='cfg_'`, etc.)
+- **`custom_prefix.py`** - Demonstrates custom prefix options (`prefix=''`, `prefix='cfg_'`, etc.)
 
 ### Running Examples
 
