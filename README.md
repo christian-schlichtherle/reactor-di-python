@@ -28,7 +28,6 @@ pip install reactor-di
 ```python
 from reactor_di import module, law_of_demeter, CachingStrategy
 
-# Example: Database service with configuration forwarding
 class DatabaseConfig:
     host = "localhost"
     port = 5432
@@ -44,7 +43,7 @@ class DatabaseService:
     def connect(self) -> str:
         return f"Connected to {self._host}:{self._port} (timeout: {self._timeout}s)"
 
-# Module: Automatic dependency injection with caching
+# Module: Automatic dependency injection, implements annotations as @cached_property functions
 @module(CachingStrategy.NOT_THREAD_SAFE)
 class AppModule:
     config: DatabaseConfig      # Directly instantiated
