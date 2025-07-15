@@ -43,7 +43,7 @@ class DatabaseService:
     def connect(self) -> str:
         return f"Connected to {self._host}:{self._port} (timeout: {self._timeout}s)"
 
-# Module: Automatic dependency injection, implements annotations as @cached_property functions
+# Module: Automatic DI: Implements annotations as @cached_property functions
 @module(CachingStrategy.NOT_THREAD_SAFE)
 class AppModule:
     config: DatabaseConfig      # Directly instantiated
