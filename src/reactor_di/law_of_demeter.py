@@ -16,7 +16,6 @@ Key Features:
 - Full inheritance hierarchy (MRO) search for annotations and abstract attributes
 - Type-safe validation with compatibility checking
 - Natural inheritance support for complex class hierarchies
-- Auto-setup for stacked decorator patterns
 - Zero runtime introspection overhead
 - Seamless integration with @module decorator from module.py
 
@@ -42,7 +41,8 @@ Example:
 For detailed usage examples and advanced patterns, see the law_of_demeter function docstring.
 """
 
-from functools import wraps
+import inspect
+import re
 from typing import Any, Callable, Type, get_type_hints
 
 from .type_utils import (
@@ -86,6 +86,11 @@ def _can_resolve_annotation(
         try:
             init_annotations = get_type_hints(cls.__init__)
             target_type = init_annotations.get(base_ref)
+
+            # If base_ref starts with underscore, also try without underscore
+            if target_type is None and base_ref.startswith("_"):
+                constructor_param = base_ref[1:]  # Remove leading underscore
+                target_type = init_annotations.get(constructor_param)
         except (NameError, AttributeError, TypeError):
             pass
 
@@ -109,6 +114,30 @@ def _can_resolve_annotation(
     has_annotation = target_attr_name in target_annotations
 
     if not (has_attr or has_annotation):
+        # Try to check if the attribute is set in the constructor
+        if inspect.isclass(target_type) and hasattr(target_type, "__init__"):
+            try:
+                init_source = inspect.getsource(target_type.__init__)
+                pattern = rf"\bself\.{re.escape(target_attr_name)}\b"
+                if re.search(pattern, init_source):
+                    return True
+            except (OSError, TypeError):
+                pass
+
+        # If source code parsing fails, try to create a test instance to check for runtime attributes
+        # This is a fallback for when source code is not available
+        try:
+            # Try to create a minimal test instance
+            # This is not ideal but necessary for some dynamic scenarios
+            test_instance = target_type()
+            if hasattr(test_instance, target_attr_name):
+                return True
+        except Exception:
+            # If instance creation fails, we can't determine if the attribute exists
+            pass
+
+        # If the target type doesn't have this attribute, this decorator cannot handle it
+        # Let another decorator handle it if it can resolve the dependency
         return False
 
     # Type compatibility check
@@ -201,9 +230,9 @@ def law_of_demeter(
             timeout: int
             is_dry_run: bool
 
-    Multiple Decorators with Auto-Setup:
-        @law_of_demeter('_config')  # Auto-setup: self._config = self._module.config
-        @law_of_demeter('_module')
+    Stacked Decorators with Auto-Setup:
+        @law_of_demeter('_config')  # Sets up: self._timeout = self._config.timeout
+        @law_of_demeter('_module')  # Sets up: self._config = self._module.config
         class ResourceController:
             def __init__(self, module):
                 self._module = module
@@ -214,7 +243,8 @@ def law_of_demeter(
             _is_dry_run: bool
 
             # From _module
-            _api: object
+            _api: API
+            _config: Config
             _namespace: str
 
     Advanced Features:
@@ -242,18 +272,19 @@ def law_of_demeter(
             _timeout: int        # IDE knows this is int
             _is_dry_run: bool    # IDE knows this is bool
 
-    Auto-Setup for Stacked Decorators:
-        The decorator automatically detects the _config + _module pattern and sets up
-        the relationship automatically:
+    Explicit Annotation Requirement:
+        The decorator only forwards properties that are explicitly annotated:
 
-        @law_of_demeter('_config')  # This decorator detects _config + _module pattern
-        @law_of_demeter('_module')
-        class ResourceController:
-            def __init__(self, module):
-                self._module = module
-                # Decorator automatically executes: self._config = module.config
+        @law_of_demeter('config')
+        class Controller:
+            def __init__(self, config):
+                self.config = config
 
-        This eliminates manual setup while maintaining clean separation of concerns.
+            _timeout: int        # Will be forwarded from config.timeout
+            _debug: bool         # Will be forwarded from config.debug
+            # config.other_attr  # Will NOT be forwarded (not annotated)
+
+        This ensures predictable behavior and prevents surprise attribute forwarding.
 
 
     Side Effect Guarantees:
@@ -285,26 +316,7 @@ def law_of_demeter(
             """Create a forwarding property for a given attribute name."""
 
             def getter(self: Any) -> Any:
-                # For stacked decorators, try to find the right base object
-                decorators = getattr(
-                    self.__class__, "__law_of_demeter_decorators__", [base_ref]
-                )
-
-                # Try each base attribute until we find one that has the target attribute
-                for base_attr_candidate in decorators:
-                    try:
-                        base_obj = getattr(self, base_attr_candidate)
-                        # Check if the attribute exists on the base class (not instance) to avoid calling properties
-                        base_class = type(base_obj)
-                        if hasattr(base_class, attr_name) or (
-                            hasattr(base_obj, "__dict__")
-                            and attr_name in base_obj.__dict__
-                        ):
-                            return getattr(base_obj, attr_name)
-                    except AttributeError:
-                        continue
-
-                # Fallback to original base_ref
+                # Direct forwarding from base_ref
                 base_obj = getattr(self, base_ref)
                 return getattr(base_obj, attr_name)
 
@@ -318,11 +330,6 @@ def law_of_demeter(
         # Use get_all_type_hints to include annotations from superclasses
         annotations = get_all_type_hints(cls)
 
-        # Track stacked decorators for auto-setup
-        if not hasattr(cls, "__law_of_demeter_decorators__"):
-            cls.__law_of_demeter_decorators__ = []
-        cls.__law_of_demeter_decorators__.append(base_ref)
-
         for annotated_name, annotated_type in annotations.items():
             # Check if this decorator instance should handle this annotation
             if not _should_handle_annotation(annotated_name, prefix):
@@ -335,12 +342,8 @@ def law_of_demeter(
             # Extract the target attribute name (remove prefix)
             target_attr_name = annotated_name[len(prefix) :]
 
-            # Skip creating properties for base attributes used in stacked decorators
-            # This allows manual assignment and auto-setup to work
-            # Also skip the base reference itself - it should be injected by other means
-            decorators = getattr(cls, "__law_of_demeter_decorators__", [])
-            all_decorators = decorators + [base_ref]
-            if annotated_name in all_decorators:
+            # Skip the base reference itself - it should be injected by other means
+            if annotated_name == base_ref:
                 continue
 
             # Check if we can resolve this annotation through the base reference
@@ -352,33 +355,6 @@ def law_of_demeter(
             # Create the forwarding property
             prop = create_forwarding_property(target_attr_name)
             setattr(cls, annotated_name, prop)
-
-        # Auto-setup for stacked decorators (e.g., _config = _module.config)
-        def setup_stacked_decorators() -> None:
-            """Auto-setup base attributes for stacked decorators."""
-            decorators = getattr(cls, "__law_of_demeter_decorators__", [])
-
-            # Look for common stacked pattern: _config + _module
-            if "_config" in decorators and "_module" in decorators:
-                # Auto-setup: self._config = self._module.config
-                original_init = cls.__init__
-
-                @wraps(original_init)
-                def new_init(self: Any, *args: Any, **kwargs: Any) -> None:
-                    # Call original init first
-                    original_init(self, *args, **kwargs)
-
-                    # Auto-setup stacked decorator attributes (only if not already set)
-                    if (
-                        hasattr(self, "_module")
-                        and hasattr(self._module, "config")
-                        and not hasattr(self, "_config")
-                    ):
-                        self._config = self._module.config
-
-                cls.__init__ = new_init
-
-        setup_stacked_decorators()
 
         return cls
 
