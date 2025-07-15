@@ -6,7 +6,7 @@
 [![Python versions](https://img.shields.io/pypi/pyversions/reactor-di.svg)](https://pypi.org/project/reactor-di/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-A code generator for dependency injection (DI) in Python based on the mediator and factory patterns.
+A code generator for dependency injection (DI) in Python which is based on the mediator and factory patterns.
 
 ## Features
 
