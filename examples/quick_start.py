@@ -9,7 +9,7 @@ This example demonstrates the core functionality of reactor-di:
 from reactor_di import CachingStrategy, law_of_demeter, module
 
 
-class DatabaseConfig:
+class Config:
     """Configuration for database connection."""
 
     host = "localhost"
@@ -18,10 +18,10 @@ class DatabaseConfig:
 
 
 @law_of_demeter("_config")
-class DatabaseService:
+class Database:
     """Database service with configuration forwarding."""
 
-    _config: DatabaseConfig
+    _config: Config
     _host: str  # Forwarded from config.host
     _port: int  # Forwarded from config.port
     _timeout: int  # Forwarded from config.timeout
@@ -36,29 +36,29 @@ class DatabaseService:
 class AppModule:
     """Application module with dependency injection."""
 
-    config: DatabaseConfig  # Directly instantiated
-    database: DatabaseService  # Synthesized with dependencies
+    config: Config  # Directly instantiated
+    database: Database  # Synthesized with dependencies
 
 
 def test_database_connection():
     """Test that database service connects with correct parameters."""
     app = AppModule()
-    db_service = app.database
+    database = app.database
 
     # Test the connection string
-    connection_result = db_service.connect()
+    connection_result = database.connect()
     assert connection_result == "Connected to localhost:5432 (timeout: 30s)"
 
 
 def test_property_forwarding():
     """Test that properties are cleanly forwarded from config."""
     app = AppModule()
-    db_service = app.database
+    database = app.database
 
     # Test forwarded properties
-    assert db_service._host == "localhost"  # from config.host
-    assert db_service._port == 5432  # from config.port
-    assert db_service._timeout == 30  # from config.timeout
+    assert database._host == "localhost"  # from config.host
+    assert database._port == 5432  # from config.port
+    assert database._timeout == 30  # from config.timeout
 
 
 def test_dependency_injection():
@@ -67,11 +67,11 @@ def test_dependency_injection():
 
     # Test that config is available
     assert app.config is not None
-    assert isinstance(app.config, DatabaseConfig)
+    assert isinstance(app.config, Config)
 
     # Test that database service is available
     assert app.database is not None
-    assert isinstance(app.database, DatabaseService)
+    assert isinstance(app.database, Database)
 
     # Test that the database service has the config injected
     assert app.database._config is app.config
@@ -82,10 +82,10 @@ def test_caching_behavior():
     app = AppModule()
 
     # Test that multiple calls return the same instance
-    db_service1 = app.database
-    db_service2 = app.database
+    database1 = app.database
+    database2 = app.database
 
-    assert db_service1 is db_service2  # Same instance due to caching
+    assert database1 is database2  # Same instance due to caching
 
     # Test that config is also cached
     config1 = app.config
