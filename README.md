@@ -1,4 +1,4 @@
-# Reactor DI
+# Reactor DI for Python
 
 [![CI](https://github.com/christian-schlichtherle/reactor-di-python/actions/workflows/ci.yaml/badge.svg)](https://github.com/christian-schlichtherle/reactor-di-python/actions/workflows/ci.yaml)
 [![Coverage Status](https://codecov.io/gh/christian-schlichtherle/reactor-di-python/branch/main/graph/badge.svg)](https://codecov.io/gh/christian-schlichtherle/reactor-di-python)
