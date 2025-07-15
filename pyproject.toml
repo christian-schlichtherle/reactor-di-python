@@ -2,6 +2,19 @@
 build-backend = "hatchling.build"
 requires = ["hatchling"]
 
+[dependency-groups]
+dev = [
+    "black>=23.0.0",
+    "mypy>=1.0.0",
+    "pre-commit>=3.0.0",
+    "ruff>=0.1.0",
+]
+test = [
+    "coverage[toml]>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest>=8.0.0",
+]
+
 [project]
 authors = [
     {name = "Christian Schlichtherle"},
@@ -34,41 +47,23 @@ Homepage = "https://github.com/christian-schlichtherle/reactor-di-python"
 Issues = "https://github.com/christian-schlichtherle/reactor-di-python/issues"
 Repository = "https://github.com/christian-schlichtherle/reactor-di-python"
 
-[dependency-groups]
-dev = [
-    "black>=23.0.0",
-    "mypy>=1.0.0",
-    "pre-commit>=3.0.0",
-    "ruff>=0.1.0",
-]
-test = [
-    "coverage[toml]>=7.0.0",
-    "pytest-cov>=4.0.0",
-    "pytest>=8.0.0",
-]
-
-[tool.hatch.build.targets.wheel]
-packages = ["src/reactor_di"]
-
-[tool.pytest.ini_options]
-addopts = [
-    "--cov-fail-under=90",
-    "--cov-report=html:coverage_html",
-    "--cov-report=term-missing",
-    "--cov-report=xml:coverage.xml",
-    "--cov=src",
-    "--strict-config",
-    "--strict-markers",
-    "--verbose",
-]
-markers = [
-    "integration: marks tests as integration tests",
-    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
-]
-python_classes = ["Test*"]
-python_files = ["test_*.py", "examples/*.py"]
-python_functions = ["test_*"]
-testpaths = ["examples", "tests"]
+[tool.black]
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+include = '\.pyi?$'
+line-length = 88
+target-version = ['py38']
 
 [tool.coverage.run]
 branch = true
@@ -97,23 +92,45 @@ fail_under = 90
 show_missing = true
 skip_covered = false
 
-[tool.black]
-extend-exclude = '''
-/(
-  # directories
-  \.eggs
-  | \.git
-  | \.hg
-  | \.mypy_cache
-  | \.tox
-  | \.venv
-  | build
-  | dist
-)/
-'''
-include = '\.pyi?$'
-line-length = 88
-target-version = ['py38']
+[tool.hatch.build.targets.wheel]
+packages = ["src/reactor_di"]
+
+[tool.mypy]
+check_untyped_defs = true
+disallow_any_generics = true
+disallow_incomplete_defs = true
+disallow_untyped_defs = true
+no_implicit_optional = true
+python_version = "3.8"
+show_error_codes = true
+strict_equality = true
+warn_redundant_casts = true
+warn_unreachable = true
+warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+disallow_untyped_defs = false
+module = ["tests.*", "examples.*"]
+
+[tool.pytest.ini_options]
+addopts = [
+    "--cov-fail-under=90",
+    "--cov-report=html:coverage_html",
+    "--cov-report=term-missing",
+    "--cov-report=xml:coverage.xml",
+    "--cov=src",
+    "--strict-config",
+    "--strict-markers",
+    "--verbose",
+]
+markers = [
+    "integration: marks tests as integration tests",
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
+python_classes = ["Test*"]
+python_files = ["test_*.py", "examples/*.py"]
+python_functions = ["test_*"]
+testpaths = ["examples", "tests"]
 
 [tool.ruff]
 line-length = 88
@@ -160,20 +177,3 @@ ignore = [
     "SIM",
     "T20",
 ]
-
-[tool.mypy]
-check_untyped_defs = true
-disallow_any_generics = true
-disallow_incomplete_defs = true
-disallow_untyped_defs = true
-no_implicit_optional = true
-python_version = "3.8"
-show_error_codes = true
-strict_equality = true
-warn_redundant_casts = true
-warn_unreachable = true
-warn_unused_ignores = true
-
-[[tool.mypy.overrides]]
-disallow_untyped_defs = false
-module = ["tests.*", "examples.*"]
