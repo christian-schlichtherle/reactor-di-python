@@ -1,106 +1,103 @@
 [build-system]
-requires = ["hatchling"]
 build-backend = "hatchling.build"
+requires = ["hatchling"]
 
 [project]
-name = "reactor-di"
-version = "0.1.0"
-description = "A code generator for dependency injection (DI) in Python which is based on the mediator and factory patterns"
-readme = "README.md"
-requires-python = ">=3.8"
 authors = [
     {name = "Christian Schlichtherle"},
 ]
-license = {text = "MIT"}
-keywords = ["dependency-injection", "di", "code-generation", "mediator", "factory"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
-    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
     "Topic :: Software Development :: Code Generators",
+    "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = []
+description = "A code generator for dependency injection (DI) in Python which is based on the mediator and factory patterns"
+keywords = ["dependency-injection", "di", "code-generation", "mediator", "factory"]
+license = {text = "MIT"}
+name = "reactor-di"
+readme = "README.md"
+requires-python = ">=3.8"
+version = "0.1.0"
 
 [project.urls]
 Homepage = "https://github.com/christian-schlichtherle/reactor-di-python"
-Repository = "https://github.com/christian-schlichtherle/reactor-di-python"
 Issues = "https://github.com/christian-schlichtherle/reactor-di-python/issues"
+Repository = "https://github.com/christian-schlichtherle/reactor-di-python"
 
 [dependency-groups]
-test = [
-    "pytest>=8.0.0",
-    "pytest-cov>=4.0.0",
-    "coverage[toml]>=7.0.0",
-]
 dev = [
     "black>=23.0.0",
-    "ruff>=0.1.0",
     "mypy>=1.0.0",
     "pre-commit>=3.0.0",
+    "ruff>=0.1.0",
+]
+test = [
+    "coverage[toml]>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest>=8.0.0",
 ]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/reactor_di"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
-python_classes = ["Test*"]
-python_functions = ["test_*"]
 addopts = [
-    "--cov=src",
     "--cov-fail-under=90",
-    "--cov-report=term-missing",
     "--cov-report=html:coverage_html",
+    "--cov-report=term-missing",
     "--cov-report=xml:coverage.xml",
+    "--cov=src",
     "--strict-config",
     "--strict-markers",
     "--verbose",
 ]
 markers = [
-    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
     "integration: marks tests as integration tests",
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
 ]
+python_classes = ["Test*"]
+python_files = ["test_*.py", "examples/*.py"]
+python_functions = ["test_*"]
+testpaths = ["examples", "tests"]
 
 [tool.coverage.run]
-source = ["src"]
 branch = true
 omit = [
-    "*/tests/*",
-    "*/test_*.py",
     "*/__pycache__/*",
     "*/conftest.py",
+    "*/test_*.py",
+    "*/tests/*",
 ]
+source = ["src"]
 
 [tool.coverage.report]
-show_missing = true
-skip_covered = false
-fail_under = 90
 exclude_lines = [
-    "pragma: no cover",
+    "@(abc\\.)?abstractmethod",
+    "class .*\\bProtocol\\):",
     "def __repr__",
-    "if self.debug:",
-    "if settings.DEBUG",
-    "raise AssertionError",
-    "raise NotImplementedError",
     "if 0:",
     "if __name__ == .__main__.:",
-    "class .*\\bProtocol\\):",
-    "@(abc\\.)?abstractmethod",
+    "if self.debug:",
+    "if settings.DEBUG",
+    "pragma: no cover",
+    "raise AssertionError",
+    "raise NotImplementedError",
 ]
+fail_under = 90
+show_missing = true
+skip_covered = false
 
 [tool.black]
-line-length = 88
-target-version = ['py38']
-include = '\.pyi?$'
 extend-exclude = '''
 /(
   # directories
@@ -114,55 +111,69 @@ extend-exclude = '''
   | dist
 )/
 '''
+include = '\.pyi?$'
+line-length = 88
+target-version = ['py38']
 
 [tool.ruff]
-target-version = "py38"
 line-length = 88
+target-version = "py38"
 
 [tool.ruff.lint]
 select = [
-    "E",  # pycodestyle errors
-    "W",  # pycodestyle warnings
-    "F",  # pyflakes
-    "I",  # isort
+    "ARG001", # unused-function-args
     "B",  # flake8-bugbear
     "C4", # flake8-comprehensions
-    "UP", # pyupgrade
-    "ARG001", # unused-function-args
+    "E",  # pycodestyle errors
+    "F",  # pyflakes
+    "FBT", # flake8-boolean-trap
+    "I",  # isort
+    "ICN", # flake8-import-conventions
+    "Q", # flake8-quotes
+    "RET", # flake8-return
     "SIM", # flake8-simplify
+    "T20", # flake8-print
     "TCH", # flake8-type-checking
     "TID", # flake8-tidy-imports
-    "Q", # flake8-quotes
-    "FBT", # flake8-boolean-trap
-    "ICN", # flake8-import-conventions
-    "RET", # flake8-return
-    "T20", # flake8-print
+    "UP", # pyupgrade
+    "W",  # pycodestyle warnings
 ]
 ignore = [
-    "E501", # line too long, handled by black
     "B008", # do not perform function calls in argument defaults
     "C901", # too complex
+    "E501", # line too long, handled by black
     "FBT002", # boolean default positional argument
     "FBT003", # boolean positional value in function call
     "T201", # print statements (can be useful for debugging)
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["ARG", "FBT", "SIM", "T20"]
+"tests/*" = [
+    "ARG",
+    "FBT",
+    "SIM",
+    "T20",
+]
+"examples/*" = [
+    "ARG",
+    "FBT",
+    "SIM",
+    "T20",
+]
 
 [tool.mypy]
-python_version = "3.8"
 check_untyped_defs = true
 disallow_any_generics = true
 disallow_incomplete_defs = true
 disallow_untyped_defs = true
 no_implicit_optional = true
-warn_redundant_casts = true
-warn_unused_ignores = true
-warn_unreachable = true
-strict_equality = true
+python_version = "3.8"
 show_error_codes = true
+strict_equality = true
+warn_redundant_casts = true
+warn_unreachable = true
+warn_unused_ignores = true
 
 [[tool.mypy.overrides]]
-module = ["tests.*"]
 disallow_untyped_defs = false
+module = ["tests.*", "examples.*"]

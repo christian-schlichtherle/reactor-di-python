@@ -59,6 +59,27 @@ print(db_service._host)      # → "localhost" (from config.host)
 print(db_service._timeout)   # → 30 (from config.timeout)
 ```
 
+## Examples
+
+The `examples/` directory contains testable examples that demonstrate all the features shown in this README:
+
+- **`quick_start.py`** - The complete Quick Start example above, converted to testable format
+- **`caching_strategies.py`** - Demonstrates `CachingStrategy.DISABLED` vs `CachingStrategy.NOT_THREAD_SAFE`
+- **`multiple_decorators.py`** - Shows using multiple `@law_of_demeter` decorators on the same class
+- **`custom_prefixes.py`** - Demonstrates custom prefix options (`prefix=''`, `prefix='cfg_'`, etc.)
+
+### Running Examples
+
+```bash
+# Run all examples as tests
+uv run pytest examples/
+
+# Run a specific example
+uv run pytest examples/quick_start.py
+```
+
+All examples are automatically tested as part of the CI pipeline to ensure they stay current with the codebase.
+
 ## Architecture
 
 Reactor DI uses a **modular file structure** for clean separation of concerns:
