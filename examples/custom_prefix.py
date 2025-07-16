@@ -24,13 +24,13 @@ class Config:
 class DirectController:
     """Controller with direct property forwarding (no prefix)."""
 
-    def __init__(self, config):
-        self.config = config
-
-    timeout: int  # → config.timeout
+    debug_mode: bool  # → config.debug_mode
     is_dry_run: bool  # → config.is_dry_run
     max_retries: int  # → config.max_retries
-    debug_mode: bool  # → config.debug_mode
+    timeout: int  # → config.timeout
+
+    def __init__(self, config: Config):
+        self.config = config
 
 
 # Custom prefix
@@ -38,13 +38,13 @@ class DirectController:
 class PrefixController:
     """Controller with custom prefix for property forwarding."""
 
-    def __init__(self, config):
-        self.config = config
-
-    cfg_timeout: int  # → config.timeout
+    cfg_debug_mode: bool  # → config.debug_mode
     cfg_is_dry_run: bool  # → config.is_dry_run
     cfg_max_retries: int  # → config.max_retries
-    cfg_debug_mode: bool  # → config.debug_mode
+    cfg_timeout: int  # → config.timeout
+
+    def __init__(self, config: Config):
+        self.config = config
 
 
 # Default prefix (for comparison)
@@ -52,17 +52,18 @@ class PrefixController:
 class DefaultController:
     """Controller with default underscore prefix."""
 
-    def __init__(self, config):
-        self.config = config
-
-    _timeout: int  # → config.timeout
+    _debug_mode: bool  # → config.debug_mode
     _is_dry_run: bool  # → config.is_dry_run
     _max_retries: int  # → config.max_retries
-    _debug_mode: bool  # → config.debug_mode
+    _timeout: int  # → config.timeout
+
+    def __init__(self, config):
+        self.config = config
 
 
 def test_no_prefix_forwarding():
     """Test direct forwarding without prefix."""
+
     config = Config()
     controller = DirectController(config)
 
@@ -82,6 +83,7 @@ def test_no_prefix_forwarding():
 
 def test_custom_prefix_forwarding():
     """Test forwarding with custom prefix."""
+
     config = Config()
     controller = PrefixController(config)
 
@@ -101,6 +103,7 @@ def test_custom_prefix_forwarding():
 
 def test_default_prefix_forwarding():
     """Test forwarding with default underscore prefix."""
+
     config = Config()
     controller = DefaultController(config)
 
@@ -120,6 +123,7 @@ def test_default_prefix_forwarding():
 
 def test_prefix_comparison():
     """Test that different prefixes work with the same config."""
+
     config = Config()
 
     direct_controller = DirectController(config)
@@ -151,6 +155,7 @@ def test_prefix_comparison():
 
 def test_dynamic_updates_across_prefixes():
     """Test that dynamic updates work across different prefix styles."""
+
     config = Config()
 
     direct_controller = DirectController(config)
@@ -183,6 +188,7 @@ def test_dynamic_updates_across_prefixes():
 
 def test_prefix_attribute_isolation():
     """Test that different prefix styles don't interfere with each other."""
+
     config = Config()
 
     # Create controllers with different prefixes

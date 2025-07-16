@@ -8,31 +8,20 @@ This example demonstrates the different caching strategies available:
 from reactor_di import CachingStrategy, module
 
 
-class MyService:
-    """Example service to demonstrate caching behavior."""
-
-    def __init__(self):
-        self.instance_id = id(self)
-
-    def get_instance_id(self) -> int:
-        """Return the instance ID for testing caching behavior."""
-        return self.instance_id
+class ServiceMock:
+    pass
 
 
 # No caching - components created fresh each time
 @module(CachingStrategy.DISABLED)
 class FactoryModule:
-    """Development module with no caching."""
-
-    service: MyService
+    service: ServiceMock
 
 
 # Cached components - same instance returned (not thread-safe)
 @module(CachingStrategy.NOT_THREAD_SAFE)
 class SingletonModule:
-    """Production module with caching enabled."""
-
-    service: MyService
+    service: ServiceMock
 
 
 def test_disabled_caching():
@@ -50,12 +39,13 @@ def test_disabled_caching():
     assert service1 is not service3
 
     # Instance IDs should be different
-    assert service1.get_instance_id() != service2.get_instance_id()
-    assert service2.get_instance_id() != service3.get_instance_id()
+    assert id(service1) != id(service2)
+    assert id(service2) != id(service3)
 
 
 def test_not_thread_safe_caching():
     """Test that NOT_THREAD_SAFE strategy caches instances."""
+
     singleton_module = SingletonModule()
 
     # Get service multiple times
@@ -69,12 +59,13 @@ def test_not_thread_safe_caching():
     assert service1 is service3
 
     # Instance IDs should be the same
-    assert service1.get_instance_id() == service2.get_instance_id()
-    assert service2.get_instance_id() == service3.get_instance_id()
+    assert id(service1) == id(service2)
+    assert id(service2) == id(service3)
 
 
 def test_different_modules_have_different_instances():
     """Test that different module instances have different cached services."""
+
     singleton_module1 = SingletonModule()
     singleton_module2 = SingletonModule()
 
@@ -83,7 +74,7 @@ def test_different_modules_have_different_instances():
 
     # Different module instances should have different service instances
     assert service1 is not service2
-    assert service1.get_instance_id() != service2.get_instance_id()
+    assert id(service1) != id(service2)
 
 
 def test_caching_strategy_comparison():

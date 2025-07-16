@@ -57,6 +57,7 @@ class ResourceController:
 
 def test_stacked_decorator_forwarding():
     """Test that all properties are properly set up by the stacked decorators."""
+
     module = AppModule()
     controller = ResourceController(module)
 
@@ -76,8 +77,9 @@ def test_stacked_decorator_forwarding():
     assert controller._timeout == 30
 
 
-def test_changes():
+def test_respect_changes():
     """Test that all properties respect changes to their base properties."""
+
     module = AppModule()
     controller = ResourceController(module)
 

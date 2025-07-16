@@ -48,6 +48,7 @@ class AppModule(ConfigMixin):
 
 def test_database_connection():
     """Test that database service connects with correct parameters."""
+
     app = AppModule()
     database = app.database
 
@@ -58,6 +59,7 @@ def test_database_connection():
 
 def test_property_forwarding():
     """Test that properties are cleanly forwarded from config."""
+
     app = AppModule()
     database = app.database
 
@@ -69,6 +71,7 @@ def test_property_forwarding():
 
 def test_dependency_injection():
     """Test that dependencies are properly injected."""
+
     app = AppModule()
 
     # Test that config is available
@@ -85,6 +88,7 @@ def test_dependency_injection():
 
 def test_caching_behavior():
     """Test that caching works correctly with NOT_THREAD_SAFE strategy."""
+
     app = AppModule()
 
     # Test that multiple calls return the same instance
