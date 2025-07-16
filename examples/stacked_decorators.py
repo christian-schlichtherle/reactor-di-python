@@ -39,9 +39,6 @@ class AppModule:
 class ResourceController:
     """Resource controller with multiple decorator integration."""
 
-    def __init__(self, module: AppModule):
-        self._module = module
-
     # From _module
     _api: API
     _config: Config
@@ -53,6 +50,9 @@ class ResourceController:
     # From _config
     _is_dry_run: bool
     _timeout: int
+
+    def __init__(self, module: AppModule):
+        self._module = module
 
 
 def test_stacked_decorator_forwarding():
