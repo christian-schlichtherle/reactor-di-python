@@ -230,8 +230,8 @@ def find_attribute_assignments(source: str, attr_name: str) -> bool:
     """
     # Use regex patterns that handle variable whitespace
     patterns = [
-        rf"self\.{re.escape(attr_name)}\s*=",
-        rf"self\.{re.escape(attr_name)}\s*:",
+        rf"self\s*\.\s*{re.escape(attr_name)}\s*=",
+        rf"self\s*\.\s*{re.escape(attr_name)}\s*:",
     ]
 
     return any(re.search(pattern, source) for pattern in patterns)
