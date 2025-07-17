@@ -269,13 +269,7 @@ def has_constructor_assignment(class_type: Type[Any], attr_name: str) -> bool:
     try:
         source = inspect.getsource(class_type.__init__)
         # Use regex patterns that handle variable whitespace
-        return any(
-            re.search(pattern, source)
-            for pattern in [
-                rf"self\s*\.\s*{re.escape(attr_name)}\s*=",
-                rf"self\s*\.\s*{re.escape(attr_name)}\s*:",
-            ]
-        )
+        return bool(re.search(rf"self\s*\.\s*{re.escape(attr_name)}\s*[=:]", source))
     except (OSError, TypeError):
         return False
 
