@@ -2,7 +2,14 @@
 
 This module provides comprehensive type checking and analysis utilities
 for the Reactor DI dependency injection system. It handles complex type
-hierarchies, inheritance patterns, and attribute resolution.
+hierarchies, inheritance patterns, and attribute resolution with robust
+error handling for edge cases in Python's type system.
+
+Key features:
+- Defensive error handling for built-in classes and compiled extensions
+- Graceful handling of forward references and invalid type syntax
+- Conservative fallback behavior for problematic type annotations
+- Efficient regex-based constructor analysis with combined patterns
 """
 
 import inspect
@@ -36,11 +43,16 @@ def get_all_type_hints(cls: Type[Any]) -> Dict[str, Any]:
     from the class and its parent classes, with child class annotations
     taking precedence over parent class annotations.
 
+    Handles problematic type annotations gracefully by skipping classes
+    that have forward references to undefined classes, invalid type syntax,
+    or other issues that prevent type hint resolution.
+
     Args:
         cls: The class to analyze for type hints.
 
     Returns:
         Dictionary mapping attribute names to their type annotations.
+        Returns empty dict if no type hints can be resolved.
 
     Example:
         >>> class Parent:
@@ -62,7 +74,7 @@ def get_all_type_hints(cls: Type[Any]) -> Dict[str, Any]:
             # Get type hints for this class in the MRO
             base_hints = get_type_hints(base)
             all_hints.update(base_hints)
-        except (TypeError, NameError, AttributeError):
+        except (TypeError, NameError, AttributeError, SyntaxError):
             # Handle cases where type hints can't be resolved
             # This can happen with forward references or complex generics
             continue
@@ -75,14 +87,16 @@ def safe_get_type_hints(cls: Type[Any]) -> Dict[str, Any]:
 
     This function provides a safe wrapper around get_type_hints that
     handles various edge cases like forward references, missing imports,
-    and complex generic types.
+    and complex generic types. Falls back to raw annotations when
+    type hint resolution fails.
 
     Args:
         cls: The class to analyze for type hints.
 
     Returns:
         Dictionary mapping attribute names to their type annotations.
-        Returns empty dict if type hints cannot be resolved.
+        Falls back to raw annotations (__annotations__) if type hints
+        cannot be resolved. Returns empty dict if both approaches fail.
 
     Example:
         >>> class Example:
@@ -96,10 +110,7 @@ def safe_get_type_hints(cls: Type[Any]) -> Dict[str, Any]:
         return get_type_hints(cls)
     except (TypeError, NameError, AttributeError):
         # Fallback to raw annotations if type hints can't be resolved
-        try:
-            return getattr(cls, "__annotations__", {})
-        except AttributeError:
-            return {}
+        return getattr(cls, "__annotations__", {})
 
 
 def needs_implementation(cls: Type[Any], attr_name: str) -> bool:
@@ -176,20 +187,13 @@ def is_type_compatible(expected_type: Any, actual_type: Any) -> bool:
         return True
 
     # Handle class inheritance
-    try:
-        if inspect.isclass(expected_type) and inspect.isclass(actual_type):
-            return issubclass(actual_type, expected_type)
-    except TypeError:
-        # Handle complex generic types gracefully
-        pass
+    if inspect.isclass(expected_type) and inspect.isclass(actual_type):
+        return issubclass(actual_type, expected_type)
 
     # Handle generic types and complex annotations
-    try:
-        # For complex type annotations, use string representation as fallback
-        if hasattr(expected_type, "__origin__") or hasattr(actual_type, "__origin__"):
-            return True  # Conservative approach for generics
-    except (TypeError, AttributeError):
-        pass
+    # For complex type annotations, use string representation as fallback
+    if hasattr(expected_type, "__origin__") or hasattr(actual_type, "__origin__"):
+        return True  # Conservative approach for generics
 
     # Conservative fallback - assume compatibility for complex cases
     return True
@@ -256,19 +260,27 @@ def should_create_dependency(attr_type: Any) -> bool:
 def has_constructor_assignment(class_type: Type[Any], attr_name: str) -> bool:
     """Check if a class constructor assigns to a specific attribute.
 
+    Uses regex pattern matching to detect both standard assignments (self.attr = value)
+    and type-annotated assignments (self.attr: Type = value) in constructor source code.
+    Handles edge cases gracefully by returning False for built-in classes, classes
+    without __init__, and other scenarios where source code cannot be inspected.
+
     Args:
         class_type: The class to check.
         attr_name: The attribute name to look for in constructor.
 
     Returns:
         True if constructor assigns to the attribute, False otherwise.
+        Returns False for built-in classes, compiled extensions, and other
+        cases where source code inspection fails.
     """
     if not hasattr(class_type, "__init__"):
         return False
 
     try:
         source = inspect.getsource(class_type.__init__)
-        # Use regex patterns that handle variable whitespace
+        # Use combined regex pattern to match both assignment and type annotation
+        # Matches: self.attr = value OR self.attr: Type = value
         return bool(re.search(rf"self\s*\.\s*{re.escape(attr_name)}\s*[=:]", source))
     except (OSError, TypeError):
         return False
@@ -286,6 +298,10 @@ def can_resolve_attribute(
     2. Constructor evidence (without execution)
     3. Supports deferred resolution for dynamic attributes
 
+    Handles problematic type annotations gracefully by catching exceptions
+    during type inspection and constructor signature analysis. Returns False
+    conservatively when static analysis cannot be performed.
+
     Args:
         cls: The class being decorated.
         base_ref: The base reference attribute name.
@@ -293,6 +309,7 @@ def can_resolve_attribute(
 
     Returns:
         True if attribute can be resolved, False otherwise.
+        Returns False conservatively when type inspection fails.
 
     Example:
         >>> class Config:
@@ -316,22 +333,17 @@ def can_resolve_attribute(
             return True  # Use deferred resolution for complex types
 
         # Check if target attribute exists in the base type
-        try:
-            target_hints = get_all_type_hints(base_type)
-            if target_attr_name in target_hints:
-                return True
+        target_hints = get_all_type_hints(base_type)
+        if target_attr_name in target_hints:
+            return True
 
-            # Check class attributes
-            if hasattr(base_type, target_attr_name):
-                return True
+        # Check class attributes
+        if hasattr(base_type, target_attr_name):
+            return True
 
-            # Check if this might be a constructor-created attribute
-            if has_constructor_assignment(base_type, target_attr_name):
-                return True
-
-        except (TypeError, AttributeError):
-            # Handle edge cases gracefully
-            pass
+        # Check if this might be a constructor-created attribute
+        if has_constructor_assignment(base_type, target_attr_name):
+            return True
 
         # For attributes that can't be statically proven, return False
         # This ensures we only create properties for attributes we can reasonably expect to exist

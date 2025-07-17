@@ -126,10 +126,7 @@ class DeferredProperty:
             alt_names = get_alternative_names(self.target_attr_name)
             for alt_name in alt_names:
                 if alt_name != self.target_attr_name:  # Don't retry the same name
-                    try:
-                        return getattr(base_obj, alt_name)
-                    except AttributeError:
-                        continue
+                    return getattr(base_obj, alt_name)
 
             raise AttributeError(
                 f"Runtime resolution failed: {self.base_ref}.{self.target_attr_name} not found"

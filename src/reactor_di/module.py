@@ -84,12 +84,8 @@ def _create_factory_method(
                     def setup_dependencies() -> None:
                         for dep_name, parent_attr in dependency_map.items():
                             # Resolve the dependency from the parent
-                            try:
-                                dep_value = getattr(self_instance, parent_attr)
-                                setattr(instance, dep_name, dep_value)
-                            except AttributeError:
-                                # If the dependency can't be resolved, skip it
-                                pass
+                            dep_value = getattr(self_instance, parent_attr)
+                            setattr(instance, dep_name, dep_value)
 
                     # Store the setup function to be called later
                     instance.__dict__[SETUP_DEPENDENCIES_ATTR] = setup_dependencies
@@ -100,13 +96,10 @@ def _create_factory_method(
                     def patched_getattribute(self: Any, name: str) -> Any:
                         # Call setup if it exists and we're accessing a dependency
                         if name in dependency_map:
-                            try:
-                                setup_func = self.__dict__.get(SETUP_DEPENDENCIES_ATTR)
-                                if setup_func:
-                                    setup_func()
-                                    del self.__dict__[SETUP_DEPENDENCIES_ATTR]
-                            except (KeyError, AttributeError):
-                                pass
+                            setup_func = self.__dict__.get(SETUP_DEPENDENCIES_ATTR)
+                            if setup_func:
+                                setup_func()
+                                del self.__dict__[SETUP_DEPENDENCIES_ATTR]
 
                         return original_getattribute(self, name)
 
@@ -196,15 +189,12 @@ def _can_create_type(attr_type: Any) -> bool:
         return False
 
     # Check if it's a class that can be instantiated
-    try:
-        # Require constructor by default
-        if not hasattr(attr_type, "__init__"):
-            return False
-
-        # Use utility function to determine if dependency should be created
-        return should_create_dependency(attr_type)
-    except (TypeError, AttributeError):
+    # Require constructor by default
+    if not hasattr(attr_type, "__init__"):
         return False
+
+    # Use utility function to determine if dependency should be created
+    return should_create_dependency(attr_type)
 
 
 def module(
