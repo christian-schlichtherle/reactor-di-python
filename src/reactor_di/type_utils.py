@@ -82,37 +82,6 @@ def get_all_type_hints(cls: Type[Any]) -> Dict[str, Any]:
     return all_hints
 
 
-def safe_get_type_hints(cls: Type[Any]) -> Dict[str, Any]:
-    """Safely get type hints with fallback handling for edge cases.
-
-    This function provides a safe wrapper around get_type_hints that
-    handles various edge cases like forward references, missing imports,
-    and complex generic types. Falls back to raw annotations when
-    type hint resolution fails.
-
-    Args:
-        cls: The class to analyze for type hints.
-
-    Returns:
-        Dictionary mapping attribute names to their type annotations.
-        Falls back to raw annotations (__annotations__) if type hints
-        cannot be resolved. Returns empty dict if both approaches fail.
-
-    Example:
-        >>> class Example:
-        ...     x: int
-        ...     y: "ForwardRef"  # Forward reference
-        >>> hints = safe_get_type_hints(Example)
-        >>> 'x' in hints
-        True
-    """
-    try:
-        return get_type_hints(cls)
-    except (TypeError, NameError, AttributeError):
-        # Fallback to raw annotations if type hints can't be resolved
-        return getattr(cls, "__annotations__", {})
-
-
 def needs_implementation(cls: Type[Any], attr_name: str) -> bool:
     """Check if an attribute needs implementation (synthesis).
 
@@ -143,59 +112,6 @@ def needs_implementation(cls: Type[Any], attr_name: str) -> bool:
             if not (inspect.isclass(attr) and attr.__name__ == attr_name):
                 return False
 
-    return True
-
-
-def is_type_compatible(expected_type: Any, actual_type: Any) -> bool:
-    """Check if two types are compatible for dependency injection.
-
-    Performs conservative type compatibility checking that handles
-    common cases while gracefully handling complex type hierarchies.
-
-    Args:
-        expected_type: The expected type annotation.
-        actual_type: The actual type to check compatibility against.
-
-    Returns:
-        True if types are compatible, False otherwise.
-        Conservative approach returns True for complex cases.
-
-    Example:
-        >>> is_type_compatible(int, int)
-        True
-        >>> is_type_compatible(str, int)
-        False
-        >>> class Parent: pass
-        >>> class Child(Parent): pass
-        >>> is_type_compatible(Parent, Child)
-        True
-    """
-    # Handle None/Any cases
-    if expected_type is None or actual_type is None:
-        return True
-
-    # Handle Any type
-    if expected_type is Any or actual_type is Any:
-        return True
-
-    # Handle string type annotations (forward references)
-    if isinstance(expected_type, str) or isinstance(actual_type, str):
-        return True  # Conservative approach for forward references
-
-    # Handle exact type matches
-    if expected_type == actual_type:
-        return True
-
-    # Handle class inheritance
-    if inspect.isclass(expected_type) and inspect.isclass(actual_type):
-        return issubclass(actual_type, expected_type)
-
-    # Handle generic types and complex annotations
-    # For complex type annotations, use string representation as fallback
-    if hasattr(expected_type, "__origin__") or hasattr(actual_type, "__origin__"):
-        return True  # Conservative approach for generics
-
-    # Conservative fallback - assume compatibility for complex cases
     return True
 
 
@@ -394,26 +310,3 @@ def can_resolve_attribute(
 
     # If we can't determine the type, be conservative
     return False
-
-
-def get_attribute_type(cls: Type[Any], attr_name: str) -> Any:
-    """Get the type annotation for an attribute.
-
-    Retrieves the type annotation for a given attribute name from
-    the class hierarchy.
-
-    Args:
-        cls: The class to check for the attribute type.
-        attr_name: Name of the attribute to get the type for.
-
-    Returns:
-        The type annotation for the attribute, or None if not found.
-
-    Example:
-        >>> class Example:
-        ...     x: int
-        >>> get_attribute_type(Example, "x") is int
-        True
-    """
-    hints = get_all_type_hints(cls)
-    return hints.get(attr_name, None)

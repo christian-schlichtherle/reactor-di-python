@@ -132,41 +132,6 @@ class DeferredProperty:
                 f"Runtime resolution failed: {self.base_ref}.{self.target_attr_name} not found"
             ) from None
 
-    def _create_forwarding_property(self) -> property:
-        """Create a forwarding property for the resolved attribute."""
-
-        def getter(self_instance: Any) -> Any:
-            base_obj = getattr(self_instance, self.base_ref)
-            return getattr(base_obj, self.target_attr_name)
-
-        def setter(self_instance: Any, value: Any) -> None:
-            base_obj = getattr(self_instance, self.base_ref)
-            setattr(base_obj, self.target_attr_name, value)
-
-        return property(getter, setter)
-
-
-def _create_static_property(base_ref: str, target_attr_name: str) -> property:
-    """Create a static forwarding property.
-
-    Args:
-        base_ref: Name of the base reference attribute.
-        target_attr_name: Name of the target attribute to forward.
-
-    Returns:
-        A property that forwards attribute access.
-    """
-
-    def getter(self_instance: Any) -> Any:
-        base_obj = getattr(self_instance, base_ref)
-        return getattr(base_obj, target_attr_name)
-
-    def setter(self_instance: Any, value: Any) -> None:
-        base_obj = getattr(self_instance, base_ref)
-        setattr(base_obj, target_attr_name, value)
-
-    return property(getter, setter)
-
 
 def law_of_demeter(
     base_ref: str,
@@ -208,17 +173,12 @@ def law_of_demeter(
         Returns:
             The decorated class with forwarding properties.
         """
-        # Use the provided prefix directly
-        effective_prefix = prefix
-
-        # Get all type hints for the class
-        hints = get_all_type_hints(cls)
-
-        # Use the base_ref as provided - no hardcoded aliases
-        actual_base_ref = base_ref
-
         # Process each annotated attribute
-        for attr_name, attr_type in hints.items():
+        for attr_name, attr_type in get_all_type_hints(cls).items():
+            # Special case: if this is the base reference itself, it must not get forwarded
+            if attr_name == base_ref:
+                continue
+
             # Skip if this attribute doesn't need implementation
             if not needs_implementation(cls, attr_name):
                 continue
@@ -231,25 +191,18 @@ def law_of_demeter(
                 continue
 
             # Extract target attribute name by removing prefix
-            if effective_prefix and attr_name.startswith(effective_prefix):
-                target_attr_name = attr_name[len(effective_prefix) :]
-            elif effective_prefix == "":
+            if prefix and attr_name.startswith(prefix):
+                target_attr_name = attr_name[len(prefix) :]
+            elif prefix == "":
                 target_attr_name = attr_name
             else:
                 # If prefix is specified but attribute doesn't match, skip
                 continue
 
-            # Special case: if this is the base reference itself,
-            # it should be injected directly, not forwarded
-            if attr_name == actual_base_ref:
-                continue
-
             # Check if we can resolve this attribute (reluctant behavior)
-            if can_resolve_attribute(cls, actual_base_ref, target_attr_name):
+            if can_resolve_attribute(cls, base_ref, target_attr_name):
                 # Always use deferred resolution to avoid recursion issues
-                deferred_prop = DeferredProperty(
-                    actual_base_ref, target_attr_name, attr_type
-                )
+                deferred_prop = DeferredProperty(base_ref, target_attr_name, attr_type)
                 setattr(cls, property_name, deferred_prop)
             # If we can't resolve it, silently skip (reluctant behavior)
 
