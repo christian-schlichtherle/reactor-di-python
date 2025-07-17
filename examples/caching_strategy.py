@@ -13,6 +13,12 @@ class ServiceMock:
 
 
 # No caching - components created fresh each time
+@module
+class DefaultModule:
+    service: ServiceMock
+
+
+# No caching - components created fresh each time
 @module(CachingStrategy.DISABLED)
 class FactoryModule:
     service: ServiceMock
@@ -26,21 +32,17 @@ class SingletonModule:
 
 def test_disabled_caching():
     """Test that DISABLED strategy creates fresh instances each time."""
-    factory_module = FactoryModule()
 
-    # Get service multiple times
-    service1 = factory_module.service
-    service2 = factory_module.service
-    service3 = factory_module.service
+    for factory_module in (DefaultModule(), FactoryModule()):
+        # Get service multiple times
+        service1 = factory_module.service
+        service2 = factory_module.service
+        service3 = factory_module.service
 
-    # Each call should return a different instance
-    assert service1 is not service2
-    assert service2 is not service3
-    assert service1 is not service3
-
-    # Instance IDs should be different
-    assert id(service1) != id(service2)
-    assert id(service2) != id(service3)
+        # Each call should return a different instance
+        assert service1 is not service2
+        assert service2 is not service3
+        assert service3 is not service1
 
 
 def test_not_thread_safe_caching():
@@ -56,11 +58,7 @@ def test_not_thread_safe_caching():
     # All calls should return the same instance
     assert service1 is service2
     assert service2 is service3
-    assert service1 is service3
-
-    # Instance IDs should be the same
-    assert id(service1) == id(service2)
-    assert id(service2) == id(service3)
+    assert service3 is service1
 
 
 def test_different_modules_have_different_instances():
@@ -74,20 +72,3 @@ def test_different_modules_have_different_instances():
 
     # Different module instances should have different service instances
     assert service1 is not service2
-    assert id(service1) != id(service2)
-
-
-def test_caching_strategy_comparison():
-    """Test that different caching strategies behave differently."""
-    factory_module = FactoryModule()
-    singleton_module = SingletonModule()
-
-    # Test dev module (no caching)
-    dev_service1 = factory_module.service
-    dev_service2 = factory_module.service
-    assert dev_service1 is not dev_service2  # Different instances
-
-    # Test prod module (with caching)
-    prod_service1 = singleton_module.service
-    prod_service2 = singleton_module.service
-    assert prod_service1 is prod_service2  # Same instance
