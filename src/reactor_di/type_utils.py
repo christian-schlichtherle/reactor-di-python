@@ -7,7 +7,7 @@ hierarchies, inheritance patterns, and attribute resolution.
 
 import inspect
 import re
-from typing import Any, Dict, List, Type, get_type_hints, Final, Tuple
+from typing import Any, Dict, Final, List, Tuple, Type, get_type_hints
 
 # Constants for internal attribute names
 DEPENDENCY_MAP_ATTR: Final[str] = "_reactor_di_dependency_map"
@@ -218,25 +218,6 @@ def get_alternative_names(name: str, default_prefix: str = "_") -> List[str]:
     return alternatives
 
 
-def find_attribute_assignments(source: str, attr_name: str) -> bool:
-    """Find attribute assignments in source code using regex patterns.
-
-    Args:
-        source: Source code to search.
-        attr_name: Attribute name to find assignments for.
-
-    Returns:
-        True if attribute assignments are found, False otherwise.
-    """
-    # Use regex patterns that handle variable whitespace
-    patterns = [
-        rf"self\s*\.\s*{re.escape(attr_name)}\s*=",
-        rf"self\s*\.\s*{re.escape(attr_name)}\s*:",
-    ]
-
-    return any(re.search(pattern, source) for pattern in patterns)
-
-
 def is_primitive_type(attr_type: Any) -> bool:
     """Check if a type should be treated as primitive.
 
@@ -270,6 +251,33 @@ def should_create_dependency(attr_type: Any) -> bool:
 
     # Check constructor requirement
     return hasattr(attr_type, "__init__")
+
+
+def has_constructor_assignment(class_type: Type[Any], attr_name: str) -> bool:
+    """Check if a class constructor assigns to a specific attribute.
+
+    Args:
+        class_type: The class to check.
+        attr_name: The attribute name to look for in constructor.
+
+    Returns:
+        True if constructor assigns to the attribute, False otherwise.
+    """
+    if not hasattr(class_type, "__init__"):
+        return False
+
+    try:
+        source = inspect.getsource(class_type.__init__)
+        # Use regex patterns that handle variable whitespace
+        return any(
+            re.search(pattern, source)
+            for pattern in [
+                rf"self\s*\.\s*{re.escape(attr_name)}\s*=",
+                rf"self\s*\.\s*{re.escape(attr_name)}\s*:",
+            ]
+        )
+    except (OSError, TypeError):
+        return False
 
 
 def can_resolve_attribute(
@@ -324,14 +332,8 @@ def can_resolve_attribute(
                 return True
 
             # Check if this might be a constructor-created attribute
-            # by looking for patterns
-            if hasattr(base_type, "__init__"):
-                try:
-                    source = inspect.getsource(base_type.__init__)
-                    if find_attribute_assignments(source, target_attr_name):
-                        return True
-                except (OSError, TypeError):
-                    pass
+            if has_constructor_assignment(base_type, target_attr_name):
+                return True
 
         except (TypeError, AttributeError):
             # Handle edge cases gracefully
@@ -370,12 +372,10 @@ def can_resolve_attribute(
                                     return True
 
                                 # Check constructor assignments
-                                if hasattr(param_type, "__init__"):
-                                    source = inspect.getsource(param_type.__init__)
-                                    if find_attribute_assignments(
-                                        source, target_attr_name
-                                    ):
-                                        return True
+                                if has_constructor_assignment(
+                                    param_type, target_attr_name
+                                ):
+                                    return True
                         except (TypeError, OSError):
                             pass
                     else:
