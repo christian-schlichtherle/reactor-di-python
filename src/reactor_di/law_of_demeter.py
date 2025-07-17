@@ -8,8 +8,12 @@ behavior, silently skipping attributes that cannot be resolved.
 from typing import Any, Callable, Type
 
 from .type_utils import (
+    DEPENDENCY_MAP_ATTR,
+    PARENT_INSTANCE_ATTR,
+    SETUP_DEPENDENCIES_ATTR,
     can_resolve_attribute,
     get_all_type_hints,
+    get_alternative_names,
     needs_implementation,
 )
 
@@ -21,7 +25,12 @@ class DeferredProperty:
     be statically proven to exist, such as constructor-created attributes.
     """
 
-    def __init__(self, base_ref: str, target_attr_name: str, expected_type: Any):
+    def __init__(
+        self,
+        base_ref: str,
+        target_attr_name: str,
+        expected_type: Any,
+    ):
         """Initialize deferred property.
 
         Args:
@@ -54,26 +63,29 @@ class DeferredProperty:
         # This is necessary for attributes that might be created during construction
 
         # First check if there's a setup function that needs to be called
-        if hasattr(instance, "_setup_dependencies"):
-            setup_func = instance._setup_dependencies
+        setup_attr = SETUP_DEPENDENCIES_ATTR
+        if hasattr(instance, setup_attr):
+            setup_func = getattr(instance, setup_attr)
             setup_func()
             # Remove the setup function after calling it
-            delattr(instance, "_setup_dependencies")
+            delattr(instance, setup_attr)
 
         try:
             base_obj = getattr(instance, self.base_ref)
         except AttributeError:
             # Try to resolve from parent instance if available
-            if hasattr(instance, "_parent_instance"):
-                parent = instance._parent_instance
+            parent_attr = PARENT_INSTANCE_ATTR
+            if hasattr(instance, parent_attr):
+                parent = getattr(instance, parent_attr)
 
                 # Check if there's a dependency mapping for this attribute
-                if (
-                    hasattr(instance, "_dependency_map")
-                    and self.base_ref in instance._dependency_map
+                dependency_map_attr = DEPENDENCY_MAP_ATTR
+                if hasattr(instance, dependency_map_attr) and self.base_ref in getattr(
+                    instance, dependency_map_attr
                 ):
-                    parent_attr = instance._dependency_map[self.base_ref]
-                    base_obj = getattr(parent, parent_attr)
+                    dependency_map = getattr(instance, dependency_map_attr)
+                    parent_attr_name = dependency_map[self.base_ref]
+                    base_obj = getattr(parent, parent_attr_name)
 
                     # Set the dependency as an instance attribute for future access
                     setattr(instance, self.base_ref, base_obj)
@@ -84,19 +96,19 @@ class DeferredProperty:
                     # Try exact match first
                     if self.base_ref in parent_hints:
                         base_obj = getattr(parent, self.base_ref)
-                    # Try without underscore prefix
-                    elif self.base_ref.startswith("_"):
-                        alt_name = self.base_ref[1:]
-                        if alt_name in parent_hints:
-                            base_obj = getattr(parent, alt_name)
-                        else:
+                    # Try alternative names based on naming configuration
+                    else:
+                        alt_names = get_alternative_names(self.base_ref)
+                        base_obj = None
+                        for alt_name in alt_names:
+                            if alt_name in parent_hints:
+                                base_obj = getattr(parent, alt_name)
+                                break
+
+                        if base_obj is None:
                             raise AttributeError(
                                 f"Runtime resolution failed: {self.base_ref} not found on {owner.__name__} or parent"
                             ) from None
-                    else:
-                        raise AttributeError(
-                            f"Runtime resolution failed: {self.base_ref} not found on {owner.__name__} or parent"
-                        ) from None
             else:
                 raise AttributeError(
                     f"Runtime resolution failed: {self.base_ref} not found on {owner.__name__}"
@@ -106,17 +118,18 @@ class DeferredProperty:
         if base_obj is None:
             raise AttributeError(f"Runtime resolution failed: {self.base_ref} is None")
 
-        # Try to get the attribute, with fallback to underscore prefix
+        # Try to get the attribute, with fallback to alternative names
         try:
             return getattr(base_obj, self.target_attr_name)
         except AttributeError:
-            # Try with underscore prefix if the direct attribute doesn't exist
-            if not self.target_attr_name.startswith("_"):
-                alt_target_attr_name = "_" + self.target_attr_name
-                try:
-                    return getattr(base_obj, alt_target_attr_name)
-                except AttributeError:
-                    pass
+            # Try alternative names based on naming configuration
+            alt_names = get_alternative_names(self.target_attr_name)
+            for alt_name in alt_names:
+                if alt_name != self.target_attr_name:  # Don't retry the same name
+                    try:
+                        return getattr(base_obj, alt_name)
+                    except AttributeError:
+                        continue
 
             raise AttributeError(
                 f"Runtime resolution failed: {self.base_ref}.{self.target_attr_name} not found"
@@ -158,29 +171,6 @@ def _create_static_property(base_ref: str, target_attr_name: str) -> property:
     return property(getter, setter)
 
 
-def _is_primitive_type(attr_type: Any) -> bool:
-    """Check if a type is a primitive type that should not be forwarded.
-
-    Args:
-        attr_type: The type to check.
-
-    Returns:
-        True if it's a primitive type, False otherwise.
-    """
-    # Handle None and Any
-    if attr_type is None or attr_type is Any:
-        return True
-
-    # Handle primitive types
-    primitive_types = (int, float, str, bool, bytes, complex)
-    if attr_type in primitive_types:
-        return True
-
-    # Handle built-in container types
-    builtin_types = (list, dict, tuple, set, frozenset)
-    return attr_type in builtin_types
-
-
 def law_of_demeter(
     base_ref: str,
     *,
@@ -194,7 +184,7 @@ def law_of_demeter(
 
     Args:
         base_ref: Name of the base reference attribute to forward from.
-        prefix: Prefix for generated property names (default: "_").
+        prefix: Prefix for generated property names (default: \"_\").
 
     Returns:
         A decorator function that modifies the class.
@@ -205,10 +195,10 @@ def law_of_demeter(
         >>> @law_of_demeter("config")
         ... class Service:
         ...     config: Config
-        ...     timeout: int  # Will be forwarded from config.timeout
+        ...     _timeout: int  # Will be forwarded from config.timeout
         >>> service = Service()
         >>> service.config = Config()
-        >>> service.timeout
+        >>> service._timeout
         30
     """
 
@@ -221,6 +211,9 @@ def law_of_demeter(
         Returns:
             The decorated class with forwarding properties.
         """
+        # Use the provided prefix directly
+        effective_prefix = prefix
+
         # Get all type hints for the class
         hints = get_all_type_hints(cls)
 
@@ -240,19 +233,13 @@ def law_of_demeter(
             if hasattr(cls, property_name):
                 continue
 
-            # The base reference should be available as a dependency, not skipped
-            # This allows it to be injected by the @module decorator
-            # if attr_name == actual_base_ref:
-            #     continue
-
-            # Extract target attribute name by removing prefix if present
-            if prefix and attr_name.startswith(prefix):
-                target_attr_name = attr_name[len(prefix) :]
-            elif prefix == "":
-                # If prefix is empty, process all attributes
+            # Extract target attribute name by removing prefix
+            if effective_prefix and attr_name.startswith(effective_prefix):
+                target_attr_name = attr_name[len(effective_prefix) :]
+            elif effective_prefix == "":
                 target_attr_name = attr_name
             else:
-                # If prefix is specified but attribute doesn't start with it, skip
+                # If prefix is specified but attribute doesn't match, skip
                 continue
 
             # Special case: if this is the base reference itself,

@@ -9,11 +9,21 @@ from functools import cached_property
 from typing import Any, Callable, Type, Union
 
 from .caching import CachingStrategy
-from .type_utils import get_all_type_hints, needs_implementation
+from .type_utils import (
+    DEPENDENCY_MAP_ATTR,
+    PARENT_INSTANCE_ATTR,
+    SETUP_DEPENDENCIES_ATTR,
+    get_all_type_hints,
+    is_primitive_type,
+    needs_implementation,
+    should_create_dependency,
+)
 
 
 def _create_factory_method(
-    attr_name: str, attr_type: Type[Any], caching_strategy: CachingStrategy
+    attr_name: str,
+    attr_type: Type[Any],
+    caching_strategy: CachingStrategy,
 ) -> Union[property, cached_property[Any]]:
     """Create a factory method for a dependency.
 
@@ -43,7 +53,7 @@ def _create_factory_method(
             # Set up lazy dependency resolution by setting a reference back to parent
             # This allows the created instance to access parent dependencies when needed
             if hasattr(instance, "__dict__"):
-                instance.__dict__["_parent_instance"] = self_instance
+                instance.__dict__[PARENT_INSTANCE_ATTR] = self_instance
 
                 # Set up lazy dependency resolution using a deferred approach
                 instance_hints = get_all_type_hints(attr_type)
@@ -65,7 +75,7 @@ def _create_factory_method(
 
                 # Store the dependency mapping for later use
                 if dependency_map:
-                    instance.__dict__["_dependency_map"] = dependency_map
+                    instance.__dict__[DEPENDENCY_MAP_ATTR] = dependency_map
 
                     # Set up the dependencies that are base references (not forwarded)
                     # These are dependencies that would be injected directly
@@ -82,7 +92,7 @@ def _create_factory_method(
                                 pass
 
                     # Store the setup function to be called later
-                    instance.__dict__["_setup_dependencies"] = setup_dependencies
+                    instance.__dict__[SETUP_DEPENDENCIES_ATTR] = setup_dependencies
 
                     # Also set up __getattribute__ to call setup when dependencies are accessed
                     original_getattribute = instance.__class__.__getattribute__
@@ -91,10 +101,10 @@ def _create_factory_method(
                         # Call setup if it exists and we're accessing a dependency
                         if name in dependency_map:
                             try:
-                                setup_func = self.__dict__.get("_setup_dependencies")
+                                setup_func = self.__dict__.get(SETUP_DEPENDENCIES_ATTR)
                                 if setup_func:
                                     setup_func()
-                                    del self.__dict__["_setup_dependencies"]
+                                    del self.__dict__[SETUP_DEPENDENCIES_ATTR]
                             except (KeyError, AttributeError):
                                 pass
 
@@ -149,8 +159,7 @@ def _apply_module_decorator(
         if not _can_create_type(attr_type):
             # Check if it's a primitive type - if so, skip it silently
             # since it's likely being handled by another decorator
-            primitive_types = (int, float, str, bool, bytes, complex, list, dict, tuple, set, frozenset)
-            if attr_type in primitive_types:
+            if is_primitive_type(attr_type):
                 continue
             raise TypeError(f"Unsatisfied dependency: {attr_name}: {attr_type}")
 
@@ -182,23 +191,18 @@ def _can_create_type(attr_type: Any) -> bool:
     if isinstance(attr_type, str):
         return False  # Cannot create from string  # type: ignore
 
-    # Handle primitive types - these should not be created as dependencies
-    primitive_types = (int, float, str, bool, bytes, complex)
-    if attr_type in primitive_types:
-        return False
-
-    # Handle built-in container types
-    builtin_types = (list, dict, tuple, set, frozenset)
-    if attr_type in builtin_types:
+    # Handle primitive and excluded types
+    if is_primitive_type(attr_type):
         return False
 
     # Check if it's a class that can be instantiated
     try:
+        # Require constructor by default
         if not hasattr(attr_type, "__init__"):
             return False
 
-        # Only create dependencies for custom classes, not built-in types
-        return attr_type.__module__ != "builtins"
+        # Use utility function to determine if dependency should be created
+        return should_create_dependency(attr_type)
     except (TypeError, AttributeError):
         return False
 
@@ -232,15 +236,13 @@ def module(
         ...     config: Config
         ...     service: MyService
     """
-    # Default caching strategy
-    default_strategy = CachingStrategy.NOT_THREAD_SAFE
-
     # Handle different call patterns
     if cls_or_strategy is None:
         # @module() - empty parentheses
-        return lambda cls: _apply_module_decorator(cls, default_strategy)
+        return lambda cls: _apply_module_decorator(cls, CachingStrategy.DISABLED)
     if isinstance(cls_or_strategy, CachingStrategy):
         # @module(CachingStrategy.NOT_THREAD_SAFE) - with strategy
-        return lambda cls: _apply_module_decorator(cls, cls_or_strategy)
+        effective_strategy = cls_or_strategy
+        return lambda cls: _apply_module_decorator(cls, effective_strategy)
     # @module - no parentheses, direct class decoration
-    return _apply_module_decorator(cls_or_strategy, default_strategy)
+    return _apply_module_decorator(cls_or_strategy, CachingStrategy.DISABLED)

@@ -1,12 +1,32 @@
 """Type utilities for dependency injection and attribute resolution.
 
 This module provides comprehensive type checking and analysis utilities
-for the reactor-di dependency injection system. It handles complex type
+for the Reactor DI dependency injection system. It handles complex type
 hierarchies, inheritance patterns, and attribute resolution.
 """
 
 import inspect
-from typing import Any, Dict, Type, get_type_hints
+import re
+from typing import Any, Dict, List, Type, get_type_hints, Final, Tuple
+
+# Constants for internal attribute names
+DEPENDENCY_MAP_ATTR: Final[str] = "_reactor_di_dependency_map"
+PARENT_INSTANCE_ATTR: Final[str] = "_reactor_di_parent_instance"
+SETUP_DEPENDENCIES_ATTR: Final[str] = "_reactor_di_setup_dependencies"
+
+PRIMITIVE_EQUIVALENT_TYPES: Final[Tuple[Type[Any], ...]] = (
+    int,
+    float,
+    str,
+    bool,
+    bytes,
+    complex,
+    list,
+    dict,
+    tuple,
+    set,
+    frozenset,
+)
 
 
 def get_all_type_hints(cls: Type[Any]) -> Dict[str, Any]:
@@ -175,7 +195,88 @@ def is_type_compatible(expected_type: Any, actual_type: Any) -> bool:
     return True
 
 
-def can_resolve_attribute(cls: Type[Any], base_ref: str, target_attr_name: str) -> bool:
+def get_alternative_names(name: str, default_prefix: str = "_") -> List[str]:
+    """Generate alternative names based on naming conventions.
+
+    Args:
+        name: The base name to generate alternatives for.
+        default_prefix: Default prefix to try removing/adding.
+
+    Returns:
+        List of alternative names to try.
+    """
+    alternatives = []
+
+    # Remove default prefix if present
+    if default_prefix and name.startswith(default_prefix):
+        alternatives.append(name[len(default_prefix) :])
+
+    # Add unprefixed version if not already included
+    if name not in alternatives:
+        alternatives.append(name)
+
+    return alternatives
+
+
+def find_attribute_assignments(source: str, attr_name: str) -> bool:
+    """Find attribute assignments in source code using regex patterns.
+
+    Args:
+        source: Source code to search.
+        attr_name: Attribute name to find assignments for.
+
+    Returns:
+        True if attribute assignments are found, False otherwise.
+    """
+    # Use regex patterns that handle variable whitespace
+    patterns = [
+        rf"self\.{re.escape(attr_name)}\s*=",
+        rf"self\.{re.escape(attr_name)}\s*:",
+    ]
+
+    return any(re.search(pattern, source) for pattern in patterns)
+
+
+def is_primitive_type(attr_type: Any) -> bool:
+    """Check if a type should be treated as primitive.
+
+    Args:
+        attr_type: The type to check.
+
+    Returns:
+        True if the type is primitive and should not be auto-instantiated.
+    """
+    if attr_type is None or attr_type is Any:
+        return True
+
+    return attr_type in PRIMITIVE_EQUIVALENT_TYPES
+
+
+def should_create_dependency(attr_type: Any) -> bool:
+    """Determine if a dependency should be automatically created.
+
+    Args:
+        attr_type: The type to check.
+
+    Returns:
+        True if the dependency should be created, False otherwise.
+    """
+    if not hasattr(attr_type, "__module__"):
+        return True
+
+    # Exclude builtins module
+    if attr_type.__module__ == "builtins":
+        return False
+
+    # Check constructor requirement
+    return hasattr(attr_type, "__init__")
+
+
+def can_resolve_attribute(
+    cls: Type[Any],
+    base_ref: str,
+    target_attr_name: str,
+) -> bool:
     """Check if an attribute can be resolved through static analysis.
 
     Multi-layer attribute detection strategy that checks:
@@ -223,12 +324,11 @@ def can_resolve_attribute(cls: Type[Any], base_ref: str, target_attr_name: str) 
                 return True
 
             # Check if this might be a constructor-created attribute
-            # by looking for simple patterns in the constructor
+            # by looking for patterns
             if hasattr(base_type, "__init__"):
                 try:
                     source = inspect.getsource(base_type.__init__)
-                    # Look for assignment pattern: self.target_attr_name =
-                    if f"self.{target_attr_name} =" in source:
+                    if find_attribute_assignments(source, target_attr_name):
                         return True
                 except (OSError, TypeError):
                     pass
@@ -254,10 +354,8 @@ def can_resolve_attribute(cls: Type[Any], base_ref: str, target_attr_name: str) 
                     continue
 
                 # Check if this parameter might correspond to our base_ref
-                # Pattern 1: Direct match (config parameter for config base_ref)
-                # Pattern 2: Underscore prefix (_module base_ref from module parameter)
-                if (param_name == base_ref or
-                    (base_ref.startswith("_") and param_name == base_ref[1:])):
+                alt_names = get_alternative_names(base_ref)
+                if param_name == base_ref or param_name in alt_names:
                     if param.annotation != inspect.Parameter.empty:
                         # We found a type annotation for the parameter
                         param_type = param.annotation
@@ -274,8 +372,9 @@ def can_resolve_attribute(cls: Type[Any], base_ref: str, target_attr_name: str) 
                                 # Check constructor assignments
                                 if hasattr(param_type, "__init__"):
                                     source = inspect.getsource(param_type.__init__)
-                                    # Look for assignment pattern: self.target_attr_name =
-                                    if f"self.{target_attr_name} =" in source:
+                                    if find_attribute_assignments(
+                                        source, target_attr_name
+                                    ):
                                         return True
                         except (TypeError, OSError):
                             pass
