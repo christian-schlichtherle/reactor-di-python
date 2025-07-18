@@ -4,10 +4,11 @@ requires = ["hatchling"]
 
 [dependency-groups]
 dev = [
-    "black>=23.0.0",
-    "mypy>=1.0.0",
-    "pre-commit>=3.0.0",
-    "ruff>=0.1.0",
+    "black>=24.0.0",
+    "mypy>=1.14.0",
+    "pre-commit>=3.5.0",
+    "ruff>=0.12.4",
+    "setuptools>=75.3.2",
 ]
 test = [
     "coverage[toml]>=7.0.0",
