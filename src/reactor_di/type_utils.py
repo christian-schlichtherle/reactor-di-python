@@ -108,7 +108,7 @@ def needs_implementation(cls: Type[Any], attr_name: str) -> bool:
     for base in cls.__mro__:
         if hasattr(base, attr_name):
             attr = getattr(base, attr_name)
-            # Skip if it's just a type annotation without value
+            # Skip unless it's a type annotation without value
             if not (inspect.isclass(attr) and attr.__name__ == attr_name):
                 return False
 

@@ -179,15 +179,12 @@ def law_of_demeter(
             if attr_name == base_ref:
                 continue
 
-            # Skip if this attribute doesn't need implementation
-            if not needs_implementation(cls, attr_name):
+            # Skip if the attribute already exists
+            if hasattr(cls, attr_name):
                 continue
 
-            # The property name is the annotated attribute name
-            property_name = attr_name
-
-            # Skip if property already exists
-            if hasattr(cls, property_name):
+            # Skip if this attribute doesn't need implementation
+            if not needs_implementation(cls, attr_name):
                 continue
 
             # Extract target attribute name by removing prefix
@@ -196,14 +193,14 @@ def law_of_demeter(
             elif prefix == "":
                 target_attr_name = attr_name
             else:
-                # If prefix is specified but attribute doesn't match, skip
+                # If the prefix is specified but the attribute doesn't match, skip
                 continue
 
             # Check if we can resolve this attribute (reluctant behavior)
             if can_resolve_attribute(cls, base_ref, target_attr_name):
                 # Always use deferred resolution to avoid recursion issues
                 deferred_prop = DeferredProperty(base_ref, target_attr_name, attr_type)
-                setattr(cls, property_name, deferred_prop)
+                setattr(cls, attr_name, deferred_prop)
             # If we can't resolve it, silently skip (reluctant behavior)
 
         return cls
