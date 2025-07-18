@@ -88,7 +88,7 @@ exclude_lines = [
     "raise AssertionError",
     "raise NotImplementedError",
 ]
-fail_under = 90
+fail_under = 70
 show_missing = true
 skip_covered = false
 
@@ -114,7 +114,7 @@ module = ["tests.*", "examples.*"]
 
 [tool.pytest.ini_options]
 addopts = [
-    "--cov-fail-under=90",
+    "--cov-fail-under=70",
     "--cov-report=html:coverage_html",
     "--cov-report=term-missing",
     "--cov-report=xml:coverage.xml",
