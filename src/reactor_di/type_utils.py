@@ -44,7 +44,7 @@ def get_all_type_hints(cls: Type[Any]) -> Dict[str, Any]:
     taking precedence over parent class annotations.
 
     Handles problematic type annotations gracefully by skipping classes
-    that have forward references to undefined classes, invalid type syntax,
+    that have forward-references to undefined classes, invalid type syntax,
     or other issues that prevent type hint resolution.
 
     Args:
@@ -63,23 +63,21 @@ def get_all_type_hints(cls: Type[Any]) -> Dict[str, Any]:
         >>> 'x' in hints and 'y' in hints
         True
     """
-    all_hints: Dict[str, Any] = {}
 
-    # Traverse MRO in reverse order so child classes override parent classes
-    for base in reversed(cls.__mro__):
-        if base is object:
-            continue
-
+    def safe_get_type_hints(base: Type[Any]) -> Dict[str, Any]:
+        """Safely get type hints from a base class."""
         try:
-            # Get type hints for this class in the MRO
-            base_hints = get_type_hints(base)
-            all_hints.update(base_hints)
+            return get_type_hints(base)
         except (TypeError, NameError, AttributeError, SyntaxError):
-            # Handle cases where type hints can't be resolved
-            # This can happen with forward references or complex generics
-            continue
+            return {}
 
-    return all_hints
+    # Dictionary comprehension with nested iteration
+    return {
+        key: value
+        for base in reversed(cls.__mro__)
+        if base is not object
+        for key, value in safe_get_type_hints(base).items()
+    }
 
 
 def needs_implementation(cls: Type[Any], attr_name: str) -> bool:
@@ -129,7 +127,7 @@ def get_alternative_names(name: str, default_prefix: str = "_") -> List[str]:
 
     # Remove default prefix if present
     if default_prefix and name.startswith(default_prefix):
-        alternatives.append(name[len(default_prefix) :])
+        alternatives.append(name[len(default_prefix):])
 
     # Add unprefixed version if not already included
     if name not in alternatives:
@@ -200,110 +198,3 @@ def has_constructor_assignment(class_type: Type[Any], attr_name: str) -> bool:
         return bool(re.search(rf"self\s*\.\s*{re.escape(attr_name)}\s*[=:]", source))
     except (OSError, TypeError):
         return False
-
-
-def can_resolve_attribute(
-    cls: Type[Any],
-    base_ref: str,
-    target_attr_name: str,
-) -> bool:
-    """Check if an attribute can be resolved through static analysis.
-
-    Multi-layer attribute detection strategy that checks:
-    1. Static analysis (annotations, class attributes)
-    2. Constructor evidence (without execution)
-    3. Supports deferred resolution for dynamic attributes
-
-    Handles problematic type annotations gracefully by catching exceptions
-    during type inspection and constructor signature analysis. Returns False
-    conservatively when static analysis cannot be performed.
-
-    Args:
-        cls: The class being decorated.
-        base_ref: The base reference attribute name.
-        target_attr_name: The target attribute name to resolve.
-
-    Returns:
-        True if attribute can be resolved, False otherwise.
-        Returns False conservatively when type inspection fails.
-
-    Example:
-        >>> class Config:
-        ...     timeout: int = 30
-        >>> class Service:
-        ...     config: Config
-        >>> can_resolve_attribute(Service, "config", "timeout")
-        True
-    """
-    # First, check if the base reference exists in class annotations
-    hints = get_all_type_hints(cls)
-    if base_ref in hints:
-        base_type = hints[base_ref]
-
-        # Handle string type annotations (forward references)
-        if isinstance(base_type, str):
-            return True  # Use deferred resolution for forward references
-
-        # Check if base_type is a class we can analyze
-        if not inspect.isclass(base_type):
-            return True  # Use deferred resolution for complex types
-
-        # Check if target attribute exists in the base type
-        target_hints = get_all_type_hints(base_type)
-        if target_attr_name in target_hints:
-            return True
-
-        # Check class attributes
-        if hasattr(base_type, target_attr_name):
-            return True
-
-        # Check if this might be a constructor-created attribute
-        # For attributes that can't be statically proven, return False
-        # This ensures we only create properties for attributes we can reasonably expect to exist
-        return has_constructor_assignment(base_type, target_attr_name)
-
-    # If base_ref is not in annotations, check if it might be set at runtime
-    # For runtime attributes like _module (set in __init__), we need to be more
-    # careful about which attributes we try to resolve
-
-    # Try to infer the type by looking at constructor parameters
-    if hasattr(cls, "__init__"):
-        try:
-            sig = inspect.signature(cls.__init__)
-            for param_name, param in sig.parameters.items():
-                if param_name == "self":
-                    continue
-
-                # Check if this parameter might correspond to our base_ref
-                alt_names = get_alternative_names(base_ref)
-                if param_name == base_ref or param_name in alt_names:
-                    if param.annotation != inspect.Parameter.empty:
-                        # We found a type annotation for the parameter
-                        param_type = param.annotation
-
-                        # Now check if the target attribute exists on this type
-                        try:
-                            if inspect.isclass(param_type):
-                                target_hints = get_all_type_hints(param_type)
-                                if target_attr_name in target_hints:
-                                    return True
-                                if hasattr(param_type, target_attr_name):
-                                    return True
-
-                                # Check constructor assignments
-                                if has_constructor_assignment(
-                                    param_type, target_attr_name
-                                ):
-                                    return True
-                        except (TypeError, OSError):
-                            pass
-                    else:
-                        # No type annotation, but parameter exists
-                        # This is more speculative, but if the user explicitly specified
-                        # this base_ref, we should trust them and use deferred resolution
-                        return True
-        except (TypeError, ValueError):
-            pass
-
-    # If we can't determine the type, be conservative
-    return False

@@ -27,8 +27,8 @@ class ConnectionManager:
         return self._url
 
 
-@law_of_demeter("manager", prefix="")
 @module(CachingStrategy.NOT_THREAD_SAFE)
+@law_of_demeter("manager", prefix="")
 class ConnectionApp:
     config: ConnectionConfig
     manager: ConnectionManager

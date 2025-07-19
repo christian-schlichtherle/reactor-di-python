@@ -13,10 +13,10 @@ class Config:
     """Configuration class with various settings."""
 
     def __init__(self):
-        self.timeout = 30
+        self.debug_mode = True
         self.is_dry_run = False
         self.max_retries = 3
-        self.debug_mode = True
+        self.timeout_seconds = 30
 
 
 # No prefix - direct forwarding
@@ -27,7 +27,7 @@ class DirectController:
     debug_mode: bool  # → config.debug_mode
     is_dry_run: bool  # → config.is_dry_run
     max_retries: int  # → config.max_retries
-    timeout: int  # → config.timeout
+    timeout_seconds: int  # → config.timeout_seconds
 
     def __init__(self, config: Config):
         self.config = config
@@ -41,7 +41,7 @@ class PrefixController:
     cfg_debug_mode: bool  # → config.debug_mode
     cfg_is_dry_run: bool  # → config.is_dry_run
     cfg_max_retries: int  # → config.max_retries
-    cfg_timeout: int  # → config.timeout
+    cfg_timeout_seconds: int  # → config.timeout_seconds
 
     def __init__(self, config: Config):
         self.config = config
@@ -55,7 +55,7 @@ class DefaultController:
     _debug_mode: bool  # → config.debug_mode
     _is_dry_run: bool  # → config.is_dry_run
     _max_retries: int  # → config.max_retries
-    _timeout: int  # → config.timeout
+    _timeout_seconds: int  # → config.timeout_seconds
 
     def __init__(self, config):
         self.config = config
@@ -68,14 +68,14 @@ def test_no_prefix_forwarding():
     controller = DirectController(config)
 
     # Test direct property access (no prefix)
-    assert controller.timeout == 30
+    assert controller.timeout_seconds == 30
     assert controller.is_dry_run is False
     assert controller.max_retries == 3
     assert controller.debug_mode is True
 
     # Test that changes are reflected
-    config.timeout = 60
-    assert controller.timeout == 60
+    config.timeout_seconds = 60
+    assert controller.timeout_seconds == 60
 
     config.is_dry_run = True
     assert controller.is_dry_run is True
@@ -88,14 +88,14 @@ def test_custom_prefix_forwarding():
     controller = PrefixController(config)
 
     # Test custom prefix property access
-    assert controller.cfg_timeout == 30
+    assert controller.cfg_timeout_seconds == 30
     assert controller.cfg_is_dry_run is False
     assert controller.cfg_max_retries == 3
     assert controller.cfg_debug_mode is True
 
     # Test that changes are reflected
-    config.timeout = 45
-    assert controller.cfg_timeout == 45
+    config.timeout_seconds = 45
+    assert controller.cfg_timeout_seconds == 45
 
     config.debug_mode = False
     assert controller.cfg_debug_mode is False
@@ -108,7 +108,7 @@ def test_default_prefix_forwarding():
     controller = DefaultController(config)
 
     # Test default prefix property access
-    assert controller._timeout == 30
+    assert controller._timeout_seconds == 30
     assert controller._is_dry_run is False
     assert controller._max_retries == 3
     assert controller._debug_mode is True
@@ -132,9 +132,9 @@ def test_prefix_comparison():
 
     # All should access the same underlying config values
     assert (
-        direct_controller.timeout
-        == prefix_controller.cfg_timeout
-        == default_controller._timeout
+        direct_controller.timeout_seconds
+        == prefix_controller.cfg_timeout_seconds
+        == default_controller._timeout_seconds
     )
     assert (
         direct_controller.is_dry_run
@@ -163,15 +163,15 @@ def test_dynamic_updates_across_prefixes():
     default_controller = DefaultController(config)
 
     # Change config values
-    config.timeout = 100
+    config.timeout_seconds = 100
     config.is_dry_run = True
     config.max_retries = 10
     config.debug_mode = False
 
     # All controllers should reflect the changes
-    assert direct_controller.timeout == 100
-    assert prefix_controller.cfg_timeout == 100
-    assert default_controller._timeout == 100
+    assert direct_controller.timeout_seconds == 100
+    assert prefix_controller.cfg_timeout_seconds == 100
+    assert default_controller._timeout_seconds == 100
 
     assert direct_controller.is_dry_run is True
     assert prefix_controller.cfg_is_dry_run is True
@@ -197,16 +197,16 @@ def test_prefix_attribute_isolation():
     default_controller = DefaultController(config)
 
     # Direct controller should have unprefixed attributes
-    assert hasattr(direct_controller, "timeout")
-    assert not hasattr(direct_controller, "_timeout")
-    assert not hasattr(direct_controller, "cfg_timeout")
+    assert hasattr(direct_controller, "timeout_seconds")
+    assert not hasattr(direct_controller, "_timeout_seconds")
+    assert not hasattr(direct_controller, "cfg_timeout_seconds")
 
     # Prefix controller should have cfg_ prefixed attributes
-    assert hasattr(prefix_controller, "cfg_timeout")
-    assert not hasattr(prefix_controller, "timeout")
-    assert not hasattr(prefix_controller, "_timeout")
+    assert hasattr(prefix_controller, "cfg_timeout_seconds")
+    assert not hasattr(prefix_controller, "timeout_seconds")
+    assert not hasattr(prefix_controller, "_timeout_seconds")
 
     # Default controller should have _ prefixed attributes
-    assert hasattr(default_controller, "_timeout")
-    assert not hasattr(default_controller, "timeout")
-    assert not hasattr(default_controller, "cfg_timeout")
+    assert hasattr(default_controller, "_timeout_seconds")
+    assert not hasattr(default_controller, "timeout_seconds")
+    assert not hasattr(default_controller, "cfg_timeout_seconds")

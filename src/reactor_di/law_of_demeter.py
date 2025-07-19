@@ -4,17 +4,16 @@ This decorator implements the Law of Demeter principle by automatically
 creating forwarding properties for annotated attributes. It uses reluctant
 behavior, silently skipping attributes that cannot be resolved.
 """
-
+import inspect
 from typing import Any, Callable, Type
 
 from .type_utils import (
     DEPENDENCY_MAP_ATTR,
     PARENT_INSTANCE_ATTR,
     SETUP_DEPENDENCIES_ATTR,
-    can_resolve_attribute,
     get_all_type_hints,
     get_alternative_names,
-    needs_implementation,
+    has_constructor_assignment,
 )
 
 
@@ -133,6 +132,113 @@ class DeferredProperty:
             ) from None
 
 
+def _can_resolve_attribute(
+    cls: Type[Any],
+    base_ref: str,
+    target_attr_name: str,
+) -> bool:
+    """Check if an attribute can be resolved through static analysis.
+
+    Multi-layer attribute detection strategy that checks:
+    1. Static analysis (annotations, class attributes)
+    2. Constructor evidence (without execution)
+    3. Supports deferred resolution for dynamic attributes
+
+    Handles problematic type annotations gracefully by catching exceptions
+    during type inspection and constructor signature analysis. Returns False
+    conservatively when static analysis cannot be performed.
+
+    Args:
+        cls: The class being decorated.
+        base_ref: The base reference attribute name.
+        target_attr_name: The target attribute name to resolve.
+
+    Returns:
+        True if attribute can be resolved, False otherwise.
+        Returns False conservatively when type inspection fails.
+
+    Example:
+        >>> class Config:
+        ...     timeout: int = 30
+        >>> class Service:
+        ...     config: Config
+        >>> _can_resolve_attribute(Service, "config", "timeout")
+        True
+    """
+    # First, check if the base reference exists in class annotations
+    hints = get_all_type_hints(cls)
+    if base_ref in hints:
+        base_type = hints[base_ref]
+
+        # Handle string type annotations (forward references)
+        if isinstance(base_type, str):
+            return True  # Use deferred resolution for forward references
+
+        # Check if base_type is a class we can analyze
+        if not inspect.isclass(base_type):
+            return True  # Use deferred resolution for complex types
+
+        # Check if target attribute exists in the base type
+        target_hints = get_all_type_hints(base_type)
+        if target_attr_name in target_hints:
+            return True
+
+        # Check class attributes
+        if hasattr(base_type, target_attr_name):
+            return True
+
+        # Check if this might be a constructor-created attribute
+        # For attributes that can't be statically proven, return False
+        # This ensures we only create properties for attributes we can reasonably expect to exist
+        return has_constructor_assignment(base_type, target_attr_name)
+
+    # If base_ref is not in annotations, check if it might be set at runtime
+    # For runtime attributes like _module (set in __init__), we need to be more
+    # careful about which attributes we try to resolve
+
+    # Try to infer the type by looking at constructor parameters
+    if hasattr(cls, "__init__"):
+        try:
+            sig = inspect.signature(cls.__init__)
+            for param_name, param in sig.parameters.items():
+                if param_name == "self":
+                    continue
+
+                # Check if this parameter might correspond to our base_ref
+                alt_names = get_alternative_names(base_ref)
+                if param_name == base_ref or param_name in alt_names:
+                    if param.annotation != inspect.Parameter.empty:
+                        # We found a type annotation for the parameter
+                        param_type = param.annotation
+
+                        # Now check if the target attribute exists on this type
+                        try:
+                            if inspect.isclass(param_type):
+                                target_hints = get_all_type_hints(param_type)
+                                if target_attr_name in target_hints:
+                                    return True
+                                if hasattr(param_type, target_attr_name):
+                                    return True
+
+                                # Check constructor assignments
+                                if has_constructor_assignment(
+                                    param_type, target_attr_name
+                                ):
+                                    return True
+                        except (TypeError, OSError):
+                            pass
+                    else:
+                        # No type annotation, but parameter exists
+                        # This is more speculative, but if the user explicitly specified
+                        # this base_ref, we should trust them and use deferred resolution
+                        return True
+        except (TypeError, ValueError):
+            pass
+
+    # If we can't determine the type, be conservative
+    return False
+
+
 def law_of_demeter(
     base_ref: str,
     *,
@@ -178,30 +284,18 @@ def law_of_demeter(
             # Special case: if this is the base reference itself, it must not get forwarded
             if attr_name == base_ref:
                 continue
-
-            # Skip if the attribute already exists
+            if not attr_name.startswith(prefix):
+                continue
             if hasattr(cls, attr_name):
                 continue
 
-            # Skip if this attribute doesn't need implementation
-            if not needs_implementation(cls, attr_name):
+            target_attr_name = attr_name[len(prefix) :]
+            if not _can_resolve_attribute(cls, base_ref, target_attr_name):
                 continue
 
-            # Extract target attribute name by removing prefix
-            if prefix and attr_name.startswith(prefix):
-                target_attr_name = attr_name[len(prefix) :]
-            elif prefix == "":
-                target_attr_name = attr_name
-            else:
-                # If the prefix is specified but the attribute doesn't match, skip
-                continue
-
-            # Check if we can resolve this attribute (reluctant behavior)
-            if can_resolve_attribute(cls, base_ref, target_attr_name):
-                # Always use deferred resolution to avoid recursion issues
-                deferred_prop = DeferredProperty(base_ref, target_attr_name, attr_type)
-                setattr(cls, attr_name, deferred_prop)
-            # If we can't resolve it, silently skip (reluctant behavior)
+            # Always use deferred resolution to avoid recursion issues
+            deferred_prop = DeferredProperty(base_ref, target_attr_name, attr_type)
+            setattr(cls, attr_name, deferred_prop)
 
         return cls
 

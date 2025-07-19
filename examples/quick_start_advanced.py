@@ -12,9 +12,10 @@ from reactor_di import CachingStrategy, law_of_demeter, module
 class Config:
     """Configuration for database connection."""
 
-    host = "localhost"
-    port = 5432
-    timeout = 30
+    def __init__(self) -> None:
+        self.host = "localhost"
+        self.port = 5432
+        self.timeout = 30
 
 
 class ConfigMixin:
