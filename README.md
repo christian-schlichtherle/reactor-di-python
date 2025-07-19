@@ -237,19 +237,27 @@ This project uses modern Python tooling and best practices:
 ### Running Tests
 
 ```bash
-# Run all tests (146 tests, 100% coverage)
+# Run all tests with coverage (20 tests in examples/, 71.95% coverage)
+./scripts/test-with-coverage.sh
+
+# Run tests without coverage (for debugging)
 uv run pytest
 
-# Run tests with coverage reporting
-uv run pytest --cov=reactor_di
-
-# Run specific test modules
-uv run pytest tests/test_module.py          # Module decorator tests
-uv run pytest tests/test_law_of_demeter.py  # Law of Demeter decorator tests  
-uv run pytest tests/test_type_utils.py      # Type compatibility utilities tests
-uv run pytest tests/test_integration.py     # Integration tests between decorators
-uv run pytest examples/                     # Run all examples as tests
+# Run example tests
+uv run pytest examples/                     # Run all examples as tests (20 tests)
+uv run pytest examples/caching_strategy.py  # Caching strategy examples (3 tests)
+uv run pytest examples/custom_prefix.py     # Custom prefix examples (6 tests)
+uv run pytest examples/quick_start.py       # Quick start examples (4 tests)
 ```
+
+### Debugging in PyCharm
+
+The project is configured to separate coverage settings from PyCharm debugging:
+
+1. **For debugging**: PyCharm uses the default `pyproject.toml` configuration without coverage
+2. **For coverage**: Use `./scripts/test-with-coverage.sh` or `pytest -c pytest-cov.ini`
+
+This ensures breakpoints work correctly in PyCharm while still maintaining coverage reports for CI/CD.
 
 ### Code Quality
 

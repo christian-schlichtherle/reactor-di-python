@@ -17,18 +17,18 @@ A code generator for dependency injection (DI) in Python based on the mediator a
 
 ### Package Management
 - `uv sync --all-groups` - Install all dependencies including dev/test/docs
-- `uv add <package>` - Add a new dependency
+- `uv add <package>` - Add a new dependency (note: adds setuptools for PyCharm compatibility)
 - `uv remove <package>` - Remove a dependency
 
 ### Testing
-- `uv run pytest` - Run all tests with coverage (146 tests including examples)
-- `uv run pytest --cov=reactor_di` - Run tests with coverage reporting
-- `uv run pytest tests/test_module.py` - Run specific test file
-- `uv run pytest examples/` - Run testable examples
+- `./scripts/test-with-coverage.sh` - Run all tests with coverage (20 tests from examples/)
+- `uv run pytest` - Run tests without coverage (useful for debugging)
+- `uv run pytest -c pytest-cov.ini` - Run tests with coverage configuration
+- `uv run pytest examples/` - Run testable examples (20 tests)
 - `uv run pytest -m "not slow"` - Skip slow tests
 
 ### Code Quality
-- `uv run ruff check src tests examples` - Run linting
+- `uv run ruff check src tests examples` - Run linting (configured for Python 3.8+ compatibility)
 - `uv run black --check src tests examples` - Check code formatting
 - `uv run black src tests examples` - Format code
 - `uv run mypy src` - Run type checking
@@ -48,17 +48,16 @@ reactor-di-python/
 │   ├── caching.py              # CachingStrategy enum for component caching
 │   ├── type_utils.py           # Shared type checking utilities
 │   └── py.typed                # Type marker for mypy
-├── tests/                      # Test suite (146 tests, 100% coverage)
-│   ├── test_module.py          # Tests for @module decorator (36 tests)
-│   ├── test_law_of_demeter.py  # Tests for @law_of_demeter decorator (59 tests)
-│   ├── test_type_utils.py      # Tests for type compatibility utilities (26 tests)
-│   └── test_integration.py     # Integration tests between decorators (6 tests)
-├── examples/                   # Testable examples (19 additional tests)
+├── tests/                      # Test suite directory (currently empty - tests in examples/)
+│   └── __init__.py             # Package initialization
+├── examples/                   # Testable examples (20 tests, acts as test suite)
 │   ├── __init__.py             # Package initialization
-│   ├── quick_start.py          # Quick Start example as tests
-│   ├── caching_strategy.py     # Caching strategy examples
-│   ├── multiple_decorators.py  # Multiple decorator examples
-│   └── custom_prefix.py        # Custom prefix examples
+│   ├── quick_start.py          # Quick Start example as tests (4 tests)
+│   ├── quick_start_advanced.py # Advanced quick start example (4 tests)
+│   ├── caching_strategy.py     # Caching strategy examples (3 tests)
+│   ├── custom_prefix.py        # Custom prefix examples (6 tests)
+│   ├── side_effects.py         # Side effects testing (1 test)
+│   └── stacked_decorators.py   # Stacked decorators example (2 tests)
 ├── .github/workflows/          # CI/CD pipelines
 │   ├── ci.yaml                 # Matrix testing across Python versions
 │   └── publish.yaml            # PyPI deployment
@@ -95,15 +94,19 @@ Shared utilities that enable type-safe DI across both decorators:
 
 ## Testing Strategy
 
-- **Coverage Achievement**: 100% test coverage maintained across all modules
+- **Coverage Achievement**: ~72% test coverage (focused on realistic scenarios)
 - **Framework**: pytest with pytest-cov
 - **Matrix Testing**: Python 3.8, 3.9, 3.10, 3.11, 3.12, 3.13
 - **Test Architecture**: 
-  - **Unit Tests**: Individual decorator functionality
-  - **Integration Tests**: Decorator cooperation and complex scenarios (`test_integration.py`)
-  - **Example Tests**: Real-world usage patterns as executable tests
+  - **Example Tests**: Real-world usage patterns as executable tests in `examples/`
+  - **Coverage Separation**: Coverage config in `pytest-cov.ini` for CI/CD, clean config for PyCharm debugging
 - **Test Quality**: Prioritize meaningful assertions over empty coverage metrics
 - **Realistic Testing**: Remove unrealistic defensive code rather than mock impossible scenarios
+
+### PyCharm Testing Configuration
+- **Debugging**: PyCharm uses `pyproject.toml` without coverage for proper breakpoint support
+- **Coverage Testing**: Use `./scripts/test-with-coverage.sh` or `pytest -c pytest-cov.ini`
+- **Setuptools Requirement**: Added to dev dependencies for PyCharm's pytest runner compatibility
 
 ## CI/CD Pipeline
 
@@ -138,5 +141,18 @@ Shared utilities that enable type-safe DI across both decorators:
 - Comprehensive testing with coverage enforcement
 - Automated CI/CD with GitHub Actions
 - Type safety with mypy
-- Code quality with ruff and black
+- Code quality with ruff and black (configured for Python 3.8+ compatibility)
 - Secure PyPI deployment with trusted publishing
+
+## Recent Updates
+
+### Python 3.8 Compatibility
+- Added `from __future__ import annotations` to support modern type syntax
+- Disabled ruff rules UP006 and UP007 that require Python 3.9+ syntax
+- Maintained use of `Type[Any]` and `Union[...]` for broader compatibility
+
+### Testing Infrastructure
+- Separated coverage configuration to enable PyCharm debugging
+- Added `pytest-cov.ini` for CI/CD coverage requirements  
+- Created `scripts/test-with-coverage.sh` for convenient coverage runs
+- Added setuptools to dev dependencies for PyCharm's pytest runner
