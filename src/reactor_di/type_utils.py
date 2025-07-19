@@ -258,12 +258,9 @@ def can_resolve_attribute(
             return True
 
         # Check if this might be a constructor-created attribute
-        if has_constructor_assignment(base_type, target_attr_name):
-            return True
-
         # For attributes that can't be statically proven, return False
         # This ensures we only create properties for attributes we can reasonably expect to exist
-        return False
+        return has_constructor_assignment(base_type, target_attr_name)
 
     # If base_ref is not in annotations, check if it might be set at runtime
     # For runtime attributes like _module (set in __init__), we need to be more
