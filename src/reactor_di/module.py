@@ -5,6 +5,8 @@ factory methods for annotated attributes. It uses greedy behavior,
 raising errors for attributes that cannot be satisfied.
 """
 
+from __future__ import annotations
+
 from functools import cached_property
 from typing import Any, Callable, Type, Union
 
