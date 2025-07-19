@@ -36,7 +36,7 @@ jobs:
       run: uv run mypy src
     
     - name: Run tests
-      run: uv run pytest
+      run: uv run pytest -c pytest-cov.ini
     
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v5

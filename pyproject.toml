@@ -115,11 +115,6 @@ module = ["tests.*", "examples.*"]
 
 [tool.pytest.ini_options]
 addopts = [
-    "--cov-fail-under=70",
-    "--cov-report=html:coverage_html",
-    "--cov-report=term-missing",
-    "--cov-report=xml:coverage.xml",
-    "--cov=src",
     "--strict-config",
     "--strict-markers",
     "--verbose",
