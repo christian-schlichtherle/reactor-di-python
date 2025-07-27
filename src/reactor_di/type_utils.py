@@ -36,48 +36,12 @@ PRIMITIVE_EQUIVALENT_TYPES: Final[Tuple[Type[Any], ...]] = (
 )
 
 
-def get_all_type_hints(cls: Type[Any]) -> Dict[str, Any]:
-    """Get all type hints from a class, including inherited annotations.
-
-    Traverses the Method Resolution Order (MRO) to collect all type hints
-    from the class and its parent classes, with child class annotations
-    taking precedence over parent class annotations.
-
-    Handles problematic type annotations gracefully by skipping classes
-    that have forward-references to undefined classes, invalid type syntax,
-    or other issues that prevent type hint resolution.
-
-    Args:
-        cls: The class to analyze for type hints.
-
-    Returns:
-        Dictionary mapping attribute names to their type annotations.
-        Returns empty dict if no type hints can be resolved.
-
-    Example:
-        >>> class Parent:
-        ...     x: int
-        >>> class Child(Parent):
-        ...     y: str
-        >>> hints = get_all_type_hints(Child)
-        >>> 'x' in hints and 'y' in hints
-        True
-    """
-
-    def safely_get_type_hints(base: Type[Any]) -> Dict[str, Any]:
-        """Safely get type hints from a base class."""
-        try:
-            return get_type_hints(base)
-        except (TypeError, NameError, AttributeError, SyntaxError):
-            return {}
-
-    # Dictionary comprehension with nested iteration
-    return {
-        key: value
-        for base in reversed(cls.__mro__)
-        if base is not object
-        for key, value in safely_get_type_hints(base).items()
-    }
+def safely_get_type_hints(base: Type[Any]) -> Dict[str, Any]:
+    """Safely get type hints from a base class."""
+    try:
+        return get_type_hints(base)
+    except (TypeError, NameError, AttributeError, SyntaxError):
+        return {}
 
 
 def needs_implementation(cls: Type[Any], attr_name: str) -> bool:

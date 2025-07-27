@@ -15,10 +15,9 @@ from .type_utils import (
     DEPENDENCY_MAP_ATTR,
     PARENT_INSTANCE_ATTR,
     SETUP_DEPENDENCIES_ATTR,
-    get_all_type_hints,
     is_primitive_type,
     needs_implementation,
-    should_create_dependency,
+    should_create_dependency, safely_get_type_hints,
 )
 
 
@@ -58,8 +57,9 @@ def _create_factory_method(
                 instance.__dict__[PARENT_INSTANCE_ATTR] = self_instance
 
                 # Set up lazy dependency resolution using a deferred approach
-                instance_hints = get_all_type_hints(attr_type)
-                parent_hints = get_all_type_hints(type(self_instance))
+                instance_hints = safely_get_type_hints(attr_type)
+                cls = type(self_instance)
+                parent_hints = safely_get_type_hints(cls)
 
                 # Store dependency mapping for later resolution
                 dependency_map = {}
@@ -138,7 +138,7 @@ def _apply_module_decorator(
         TypeError: If any dependency cannot be satisfied (greedy behavior).
     """
     # Get all type hints for the class
-    hints = get_all_type_hints(cls)
+    hints = safely_get_type_hints(cls)
 
     # Process each annotated attribute
     for attr_name, attr_type in hints.items():

@@ -11,9 +11,8 @@ from .type_utils import (
     DEPENDENCY_MAP_ATTR,
     PARENT_INSTANCE_ATTR,
     SETUP_DEPENDENCIES_ATTR,
-    get_all_type_hints,
     get_alternative_names,
-    has_constructor_assignment,
+    has_constructor_assignment, safely_get_type_hints,
 )
 
 
@@ -90,7 +89,8 @@ class DeferredProperty:
                     setattr(instance, self.base_ref, base_obj)
                 else:
                     # Fallback to type hints checking
-                    parent_hints = get_all_type_hints(type(parent))
+                    cls = type(parent)
+                    parent_hints = safely_get_type_hints(cls)
 
                     # Try exact match first
                     if self.base_ref in parent_hints:
@@ -166,30 +166,21 @@ def _can_resolve_attribute(
         True
     """
     # First, check if the base reference exists in class annotations
-    hints = get_all_type_hints(cls)
+    hints = safely_get_type_hints(cls)
     if base_ref in hints:
         base_type = hints[base_ref]
 
-        # Handle string type annotations (forward references)
+        if hasattr(base_type, target_attr_name):
+            return True
         if isinstance(base_type, str):
             return True  # Use deferred resolution for forward references
-
-        # Check if base_type is a class we can analyze
         if not inspect.isclass(base_type):
             return True  # Use deferred resolution for complex types
 
-        # Check if target attribute exists in the base type
-        target_hints = get_all_type_hints(base_type)
+        target_hints = safely_get_type_hints(base_type)
         if target_attr_name in target_hints:
             return True
 
-        # Check class attributes
-        if hasattr(base_type, target_attr_name):
-            return True
-
-        # Check if this might be a constructor-created attribute
-        # For attributes that can't be statically proven, return False
-        # This ensures we only create properties for attributes we can reasonably expect to exist
         return has_constructor_assignment(base_type, target_attr_name)
 
     # If base_ref is not in annotations, check if it might be set at runtime
@@ -214,7 +205,7 @@ def _can_resolve_attribute(
                         # Now check if the target attribute exists on this type
                         try:
                             if inspect.isclass(param_type):
-                                target_hints = get_all_type_hints(param_type)
+                                target_hints = safely_get_type_hints(param_type)
                                 if target_attr_name in target_hints:
                                     return True
                                 if hasattr(param_type, target_attr_name):
@@ -280,13 +271,13 @@ def law_of_demeter(
             The decorated class with forwarding properties.
         """
         # Process each annotated attribute
-        for attr_name, attr_type in get_all_type_hints(cls).items():
+        for attr_name, attr_type in safely_get_type_hints(cls).items():
             # Special case: if this is the base reference itself, it must not get forwarded
             if attr_name == base_ref:
                 continue
-            if not attr_name.startswith(prefix):
-                continue
             if hasattr(cls, attr_name):
+                continue
+            if not attr_name.startswith(prefix):
                 continue
 
             target_attr_name = attr_name[len(prefix) :]
