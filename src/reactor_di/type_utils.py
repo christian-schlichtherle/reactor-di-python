@@ -64,7 +64,7 @@ def get_all_type_hints(cls: Type[Any]) -> Dict[str, Any]:
         True
     """
 
-    def safe_get_type_hints(base: Type[Any]) -> Dict[str, Any]:
+    def safely_get_type_hints(base: Type[Any]) -> Dict[str, Any]:
         """Safely get type hints from a base class."""
         try:
             return get_type_hints(base)
@@ -76,7 +76,7 @@ def get_all_type_hints(cls: Type[Any]) -> Dict[str, Any]:
         key: value
         for base in reversed(cls.__mro__)
         if base is not object
-        for key, value in safe_get_type_hints(base).items()
+        for key, value in safely_get_type_hints(base).items()
     }
 
 
@@ -174,8 +174,9 @@ def should_create_dependency(attr_type: Any) -> bool:
 def has_constructor_assignment(class_type: Type[Any], attr_name: str) -> bool:
     """Check if a class constructor assigns to a specific attribute.
 
-    Uses regex pattern matching to detect both standard assignments (self.attr = value)
-    and type-annotated assignments (self.attr: Type = value) in constructor source code.
+    Uses regex pattern matching to detect both standard assignments (instance.attr = value)
+    and type-annotated assignments (instance.attr: Type = value) in constructor source code.
+    Dynamically determines the first parameter name instead of hardcoding "self".
     Handles edge cases gracefully by returning False for built-in classes, classes
     without __init__, and other scenarios where source code cannot be inspected.
 
@@ -192,9 +193,12 @@ def has_constructor_assignment(class_type: Type[Any], attr_name: str) -> bool:
         return False
 
     try:
+        # Get the first parameter name from the constructor signature, which is usually "self", but could be anything
+        self = next(iter(inspect.signature(class_type.__init__).parameters))
+
         source = inspect.getsource(class_type.__init__)
         # Use combined regex pattern to match both assignment and type annotation
         # Matches: self.attr = value OR self.attr: Type = value
-        return bool(re.search(rf"self\s*\.\s*{re.escape(attr_name)}\s*[=:]", source))
-    except (OSError, TypeError):
+        return bool(re.search(rf"{re.escape(self)}\s*\.\s*{re.escape(attr_name)}\s*[=:]", source))
+    except (OSError, TypeError, ValueError):
         return False
