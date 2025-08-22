@@ -41,7 +41,7 @@ license = {text = "MIT"}
 name = "reactor-di"
 readme = "README.md"
 requires-python = ">=3.8"
-version = "0.1.0"
+version = "0.1.1"
 
 [project.urls]
 Homepage = "https://github.com/christian-schlichtherle/reactor-di-python"
