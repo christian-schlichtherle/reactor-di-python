@@ -3,3 +3,4 @@
 /.venv
 /CLAUDE.local.mc
 __pycache__/
+coverage.xml
