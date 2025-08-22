@@ -16,13 +16,13 @@ A code generator for dependency injection (DI) in Python based on the mediator a
 ## Common Commands
 
 ### Package Management
-- `uv sync --all-groups` - Install all dependencies including dev/test/docs
-- `uv add <package>` - Add a new dependency (note: adds setuptools for PyCharm compatibility)
+- `uv sync` - Install all dependencies (single dev group)
+- `uv add <package>` - Add a new dependency
 - `uv remove <package>` - Remove a dependency
 
 ### Testing
 - `uv run pytest` - Run tests without coverage (fast, for development)
-- `uv run pytest --cov` - Run tests with coverage and HTML/terminal reports
+- `uv run pytest --cov` - Run tests with coverage and HTML/terminal/XML reports
 - `uv run pytest examples/` - Run testable examples (20 tests)
 - `uv run pytest -m "not slow"` - Skip slow tests
 
@@ -99,15 +99,15 @@ Simplified utilities that enable type-safe DI across both decorators:
 - **Matrix Testing**: Python 3.8, 3.9, 3.10, 3.11, 3.12, 3.13
 - **Test Architecture**: 
   - **Example Tests**: Real-world usage patterns as executable tests in `examples/`
-  - **Coverage Separation**: Coverage config in `pytest-cov.ini` for CI/CD, clean config for PyCharm debugging
+  - **Streamlined Configuration**: Minimal pytest configuration for essential functionality
 - **Test Quality**: Prioritize meaningful assertions over empty coverage metrics
 - **Realistic Testing**: Remove unrealistic defensive code rather than mock impossible scenarios
 
-### PyCharm Testing Configuration
-- **Default**: PyCharm runs tests without coverage for fast feedback and debugging
+### Development Configuration
+- **Single Dependency Group**: Combined dev tools for simplified management
 - **Coverage Testing**: Use `--cov` flag to enable coverage when needed
 - **Coverage Threshold**: Set to 90% (fail_under = 90) when coverage is enabled
-- **Setuptools Requirement**: Added to dev dependencies for PyCharm's pytest runner compatibility
+- **Essential Tools Only**: Black, mypy, pytest-cov, pytest, ruff
 
 ## CI/CD Pipeline
 
@@ -120,7 +120,7 @@ Simplified utilities that enable type-safe DI across both decorators:
 
 1. Make changes in `src/reactor_di/`
 2. Add/update tests in `tests/` and examples in `examples/`
-3. Run quality checks: `uv run pytest && uv run ruff check src tests examples && uv run mypy src`
+3. Run quality checks: `uv run pytest --cov && uv run ruff check src tests examples && uv run mypy src`
 4. Update documentation if needed
 5. Commit and push (CI will validate)
 
@@ -163,8 +163,8 @@ Simplified utilities that enable type-safe DI across both decorators:
 - Maintained use of `Type[Any]` and `Union[...]` for broader compatibility
 
 ### Testing Infrastructure
-- Unified configuration in `pyproject.toml` with coverage as opt-in via `--cov`
-- Coverage reports (HTML and terminal) generated when `--cov` flag is used
+- Single dependency group combining dev and test tools for simplicity
+- Coverage reports (HTML, terminal, XML) generated when `--cov` flag is used
 - Coverage threshold set to 90% for higher quality standards
-- Optimized for fast development cycles with coverage disabled by default
-- Added setuptools to dev dependencies for PyCharm's pytest runner
+- Minimal pytest configuration focused on essential functionality
+- Streamlined dependency footprint with only essential tools
