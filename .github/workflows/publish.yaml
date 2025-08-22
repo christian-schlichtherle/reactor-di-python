@@ -24,7 +24,7 @@ jobs:
         run: uv sync --all-groups
 
       - name: Run tests
-        run: uv run pytest -c pytest-cov.ini
+        run: uv run pytest
 
   publish:
     name: Publish to PyPI
