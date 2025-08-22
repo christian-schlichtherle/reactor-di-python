@@ -42,12 +42,9 @@ def _create_factory_method(
         Instantiates the dependency and sets up lazy resolution for its
         sub-dependencies through a deferred loading mechanism.
         """
-        # Validate that the type can be instantiated
-        if not hasattr(attr_type, "__init__"):
-            raise TypeError(f"Cannot instantiate {attr_type.__name__}: no constructor")
 
-        # Create the instance without trying to resolve dependencies
-        # Dependencies will be resolved lazily when accessed
+        # Create the instance without trying to resolve any dependencies.
+        # The dependencies will be resolved lazily when accessed.
         instance = attr_type()
 
         # Set up lazy dependency resolution by setting a reference back to parent
