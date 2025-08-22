@@ -91,7 +91,7 @@ def get_alternative_names(name: str, default_prefix: str = "_") -> List[str]:
 
     # Remove default prefix if present
     if default_prefix and name.startswith(default_prefix):
-        alternatives.append(name[len(default_prefix):])
+        alternatives.append(name[len(default_prefix) :])
 
     # Add unprefixed version if not already included
     if name not in alternatives:
@@ -163,6 +163,10 @@ def has_constructor_assignment(class_type: Type[Any], attr_name: str) -> bool:
         source = inspect.getsource(class_type.__init__)
         # Use combined regex pattern to match both assignment and type annotation
         # Matches: self.attr = value OR self.attr: Type = value
-        return bool(re.search(rf"{re.escape(self)}\s*\.\s*{re.escape(attr_name)}\s*[=:]", source))
+        return bool(
+            re.search(
+                rf"{re.escape(self)}\s*\.\s*{re.escape(attr_name)}\s*[=:]", source
+            )
+        )
     except (OSError, TypeError, ValueError):
         return False

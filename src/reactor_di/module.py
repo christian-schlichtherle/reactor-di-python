@@ -235,7 +235,6 @@ def module(
         return lambda cls: _apply_module_decorator(cls, CachingStrategy.DISABLED)
     if isinstance(cls_or_strategy, CachingStrategy):
         # @module(CachingStrategy.NOT_THREAD_SAFE) - with strategy
-        effective_strategy = cls_or_strategy
-        return lambda cls: _apply_module_decorator(cls, effective_strategy)
+        return lambda cls: _apply_module_decorator(cls, cls_or_strategy)
     # @module - no parentheses, direct class decoration
     return _apply_module_decorator(cls_or_strategy, CachingStrategy.DISABLED)

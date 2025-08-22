@@ -4,6 +4,7 @@ This decorator implements the Law of Demeter principle by automatically
 creating forwarding properties for annotated attributes. It uses reluctant
 behavior, silently skipping attributes that cannot be resolved.
 """
+
 import inspect
 from typing import Any, Callable, Type
 
