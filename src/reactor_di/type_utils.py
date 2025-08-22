@@ -92,7 +92,7 @@ def get_alternative_names(name: str, default_prefix: str = "_") -> List[str]:
     return alternatives
 
 
-def is_primitive_type(attr_type: Any) -> bool:
+def is_primitive_type(attr_type: Type[Any]) -> bool:
     """Check if a type should be treated as primitive.
 
     Args:
@@ -107,7 +107,7 @@ def is_primitive_type(attr_type: Any) -> bool:
     return attr_type in PRIMITIVE_EQUIVALENT_TYPES
 
 
-def should_create_dependency(attr_type: Any) -> bool:
+def should_create_dependency(attr_type: Type[Any]) -> bool:
     """Determine if a dependency should be automatically created.
 
     Args:

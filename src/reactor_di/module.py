@@ -22,9 +22,7 @@ from .type_utils import (
 
 
 def _create_factory_method(
-    attr_name: str,
-    attr_type: Type[Any],
-    caching_strategy: CachingStrategy,
+    attr_type: Type[Any], caching_strategy: CachingStrategy
 ) -> Union[property, cached_property[Any]]:
     """Create a factory method for a dependency.
 
@@ -40,78 +38,70 @@ def _create_factory_method(
     def factory(self_instance: Any) -> Any:
         """Factory function that creates the dependency."""
         # Try to create instance with dependencies
-        try:
-            # Get the class constructor
-            if not hasattr(attr_type, "__init__"):
-                raise TypeError(
-                    f"Cannot instantiate {attr_type.__name__}: no constructor"
-                )
+        # Get the class constructor
+        if not hasattr(attr_type, "__init__"):
+            raise TypeError(f"Cannot instantiate {attr_type.__name__}: no constructor")
 
-            # Create the instance without trying to resolve dependencies
-            # Dependencies will be resolved lazily when accessed
-            instance = attr_type()
+        # Create the instance without trying to resolve dependencies
+        # Dependencies will be resolved lazily when accessed
+        instance = attr_type()
 
-            # Set up lazy dependency resolution by setting a reference back to parent
-            # This allows the created instance to access parent dependencies when needed
-            if hasattr(instance, "__dict__"):
-                instance.__dict__[PARENT_INSTANCE_ATTR] = self_instance
+        # Set up lazy dependency resolution by setting a reference back to parent
+        # This allows the created instance to access parent dependencies when needed
+        if hasattr(instance, "__dict__"):
+            instance.__dict__[PARENT_INSTANCE_ATTR] = self_instance
 
-                # Set up lazy dependency resolution using a deferred approach
-                instance_hints = get_type_hints(attr_type)
-                parent_hints = get_type_hints(type(self_instance))
+            # Set up lazy dependency resolution using a deferred approach
+            instance_hints = get_type_hints(attr_type)
+            parent_hints = get_type_hints(type(self_instance))
 
-                # Store dependency mapping for later resolution
-                dependency_map = {}
+            # Store dependency mapping for later resolution
+            dependency_map = {}
 
-                # For each dependency needed by the instance
-                for dep_name, _dep_type in instance_hints.items():
-                    # Check for direct match first (config -> config)
-                    if dep_name in parent_hints:
-                        dependency_map[dep_name] = dep_name
-                    # Check for underscore prefix pattern (_config -> config)
-                    elif dep_name.startswith("_"):
-                        alt_name = dep_name[1:]  # Remove leading underscore
-                        if alt_name in parent_hints:
-                            dependency_map[dep_name] = alt_name
+            # For each dependency needed by the instance
+            for dep_name, _dep_type in instance_hints.items():
+                # Check for direct match first (config -> config)
+                if dep_name in parent_hints:
+                    dependency_map[dep_name] = dep_name
+                # Check for underscore prefix pattern (_config -> config)
+                elif dep_name.startswith("_"):
+                    alt_name = dep_name[1:]  # Remove leading underscore
+                    if alt_name in parent_hints:
+                        dependency_map[dep_name] = alt_name
 
-                # Store the dependency mapping for later use
-                if dependency_map:
-                    instance.__dict__[DEPENDENCY_MAP_ATTR] = dependency_map
+            # Store the dependency mapping for later use
+            if dependency_map:
+                instance.__dict__[DEPENDENCY_MAP_ATTR] = dependency_map
 
-                    # Set up the dependencies that are base references (not forwarded)
-                    # These are dependencies that would be injected directly
-                    # We need to defer this until after the instance is fully created
-                    # to avoid circular dependencies
-                    def setup_dependencies() -> None:
-                        for dep_name, parent_attr in dependency_map.items():
-                            # Resolve the dependency from the parent
-                            dep_value = getattr(self_instance, parent_attr)
-                            setattr(instance, dep_name, dep_value)
+                # Set up the dependencies that are base references (not forwarded)
+                # These are dependencies that would be injected directly
+                # We need to defer this until after the instance is fully created
+                # to avoid circular dependencies
+                def setup_dependencies() -> None:
+                    for dep_name, parent_attr in dependency_map.items():
+                        # Resolve the dependency from the parent
+                        dep_value = getattr(self_instance, parent_attr)
+                        setattr(instance, dep_name, dep_value)
 
-                    # Store the setup function to be called later
-                    instance.__dict__[SETUP_DEPENDENCIES_ATTR] = setup_dependencies
+                # Store the setup function to be called later
+                instance.__dict__[SETUP_DEPENDENCIES_ATTR] = setup_dependencies
 
-                    # Also set up __getattribute__ to call setup when dependencies are accessed
-                    original_getattribute = instance.__class__.__getattribute__
+                # Also set up __getattribute__ to call setup when dependencies are accessed
+                original_getattribute = instance.__class__.__getattribute__
 
-                    def patched_getattribute(self: Any, name: str) -> Any:
-                        # Call setup if it exists and we're accessing a dependency
-                        if name in dependency_map:
-                            setup_func = self.__dict__.get(SETUP_DEPENDENCIES_ATTR)
-                            if setup_func:
-                                setup_func()
-                                del self.__dict__[SETUP_DEPENDENCIES_ATTR]
+                def patched_getattribute(self: Any, name: str) -> Any:
+                    # Call setup if it exists and we're accessing a dependency
+                    if name in dependency_map:
+                        setup_func = self.__dict__.get(SETUP_DEPENDENCIES_ATTR)
+                        if setup_func:
+                            setup_func()
+                            del self.__dict__[SETUP_DEPENDENCIES_ATTR]
 
-                        return original_getattribute(self, name)
+                    return original_getattribute(self, name)
 
-                    instance.__class__.__getattribute__ = patched_getattribute
+                instance.__class__.__getattribute__ = patched_getattribute
 
-            return instance
-
-        except Exception as e:
-            raise TypeError(
-                f"Failed to create {attr_name}: {attr_type.__name__}: {e}"
-            ) from e
+        return instance
 
     # Apply caching strategy
     if caching_strategy == CachingStrategy.NOT_THREAD_SAFE:
@@ -155,8 +145,8 @@ def _apply_module_decorator(
                 continue
             raise TypeError(f"Unsatisfied dependency: {attr_name}: {attr_type}")
 
-        # Create factory method
-        factory_method = _create_factory_method(attr_name, attr_type, caching_strategy)
+        # Create the factory method
+        factory_method = _create_factory_method(attr_type, caching_strategy)
         setattr(cls, attr_name, factory_method)
 
         # Call __set_name__ if it exists (required for cached_property)
