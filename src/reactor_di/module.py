@@ -16,8 +16,6 @@ from .type_utils import (
     PARENT_INSTANCE_ATTR,
     SETUP_DEPENDENCIES_ATTR,
     is_primitive_type,
-    needs_implementation,
-    should_create_dependency,
 )
 
 
@@ -26,8 +24,11 @@ def _create_factory_method(
 ) -> Union[property, cached_property[Any]]:
     """Create a factory method for a dependency.
 
+    Generates a property that lazily instantiates dependencies. The factory
+    handles dependency injection by mapping child class dependencies to
+    parent class attributes through naming conventions.
+
     Args:
-        attr_name: Name of the attribute to create a factory for.
         attr_type: Type of the dependency to create.
         caching_strategy: Caching strategy to use.
 
@@ -36,9 +37,12 @@ def _create_factory_method(
     """
 
     def factory(self_instance: Any) -> Any:
-        """Factory function that creates the dependency."""
-        # Try to create instance with dependencies
-        # Get the class constructor
+        """Factory function that creates the dependency.
+
+        Instantiates the dependency and sets up lazy resolution for its
+        sub-dependencies through a deferred loading mechanism.
+        """
+        # Validate that the type can be instantiated
         if not hasattr(attr_type, "__init__"):
             raise TypeError(f"Cannot instantiate {attr_type.__name__}: no constructor")
 
@@ -59,11 +63,11 @@ def _create_factory_method(
             dependency_map = {}
 
             # For each dependency needed by the instance
-            for dep_name, _dep_type in instance_hints.items():
-                # Check for direct match first (config -> config)
+            for dep_name in instance_hints:
+                # Direct match: dependency name matches parent attribute
                 if dep_name in parent_hints:
                     dependency_map[dep_name] = dep_name
-                # Check for underscore prefix pattern (_config -> config)
+                # Convention match: _config maps to config in parent
                 elif dep_name.startswith("_"):
                     alt_name = dep_name[1:]  # Remove leading underscore
                     if alt_name in parent_hints:
@@ -112,12 +116,16 @@ def _create_factory_method(
 
 
 def _apply_module_decorator(
-    cls: Type[Any], caching_strategy: CachingStrategy
+    class_type: Type[Any], caching_strategy: CachingStrategy
 ) -> Type[Any]:
     """Apply the module decorator to a class.
 
+    Processes all type-annotated attributes and creates factory methods for
+    instantiable types. Skips primitive types and raises errors for
+    unsatisfiable dependencies.
+
     Args:
-        cls: The class to decorate.
+        class_type: The class to decorate.
         caching_strategy: The caching strategy to use.
 
     Returns:
@@ -126,77 +134,48 @@ def _apply_module_decorator(
     Raises:
         TypeError: If any dependency cannot be satisfied (greedy behavior).
     """
-    # Get all type hints for the class
-    # Process each annotated attribute
-    for attr_name, attr_type in get_type_hints(cls).items():
-        # Skip if this attribute doesn't need implementation
-        if not needs_implementation(cls, attr_name):
+    # Process each type-annotated attribute
+    for attr_name, attr_type in get_type_hints(class_type).items():
+        if hasattr(class_type, attr_name):
             continue
 
-        # Skip if property already exists
-        if hasattr(cls, attr_name):
+        if isinstance(attr_type, str):
+            raise TypeError(
+                f"Cannot instantiate dependencies of unchecked types: {attr_name}"
+            )
+
+        # Skip primitive types (handled by other decorators)
+        if is_primitive_type(attr_type):
             continue
 
         # Validate that we can create this type (greedy behavior)
-        if not _can_create_type(attr_type):
-            # Check if it's a primitive type - if so, skip it silently
-            # since it's likely being handled by another decorator
-            if is_primitive_type(attr_type):
-                continue
-            raise TypeError(f"Unsatisfied dependency: {attr_name}: {attr_type}")
+        if not hasattr(attr_type, "__init__"):
+            raise TypeError(
+                f"Cannot instantiate dependencies without a (potentially implicit) constructor: {attr_name}: {attr_type}"
+            )
 
         # Create the factory method
         factory_method = _create_factory_method(attr_type, caching_strategy)
-        setattr(cls, attr_name, factory_method)
+        setattr(class_type, attr_name, factory_method)
 
         # Call __set_name__ if it exists (required for cached_property)
         if hasattr(factory_method, "__set_name__"):
-            factory_method.__set_name__(cls, attr_name)
+            factory_method.__set_name__(class_type, attr_name)
 
-    return cls
-
-
-def _can_create_type(attr_type: Any) -> bool:
-    """Check if a type can be created (greedy validation).
-
-    Args:
-        attr_type: The type to validate.
-
-    Returns:
-        True if the type can be created, False otherwise.
-    """
-    # Handle None and Any
-    if attr_type is None or attr_type is Any:
-        return False
-
-    # Handle string type annotations (forward references)
-    if isinstance(attr_type, str):
-        return False  # Cannot create from string  # type: ignore
-
-    # Handle primitive and excluded types
-    if is_primitive_type(attr_type):
-        return False
-
-    # Check if it's a class that can be instantiated
-    # Require constructor by default
-    if not hasattr(attr_type, "__init__"):
-        return False
-
-    # Use utility function to determine if dependency should be created
-    return should_create_dependency(attr_type)
+    return class_type
 
 
 def module(
-    cls_or_strategy: Union[type, CachingStrategy, None] = None, /
-) -> Union[type, Callable[[type], type]]:
+    class_or_strategy: Union[Type[Any], CachingStrategy, None] = None, /
+) -> Union[Type[Any], Callable[[Type[Any]], Type[Any]]]:
     """Module decorator for dependency injection.
 
     This decorator automatically creates factory methods for annotated
     attributes, implementing dependency injection with configurable caching.
-    It uses greedy behavior, raising errors for unsatisfied dependencies.
+    It uses greedy behaviour, raising errors for unsatisfied dependencies.
 
     Args:
-        cls_or_strategy: Either a class to decorate directly, or a caching strategy.
+        class_or_strategy: Either a class to decorate directly, or a caching strategy.
 
     Returns:
         Either a decorated class or a decorator function.
@@ -216,11 +195,13 @@ def module(
         ...     service: MyService
     """
     # Handle different call patterns
-    if cls_or_strategy is None:
+    if class_or_strategy is None:
         # @module() - empty parentheses
-        return lambda cls: _apply_module_decorator(cls, CachingStrategy.DISABLED)
-    if isinstance(cls_or_strategy, CachingStrategy):
+        return lambda class_type: _apply_module_decorator(
+            class_type, CachingStrategy.DISABLED
+        )
+    if isinstance(class_or_strategy, CachingStrategy):
         # @module(CachingStrategy.NOT_THREAD_SAFE) - with strategy
-        return lambda cls: _apply_module_decorator(cls, cls_or_strategy)
+        return lambda class_type: _apply_module_decorator(class_type, class_or_strategy)
     # @module - no parentheses, direct class decoration
-    return _apply_module_decorator(cls_or_strategy, CachingStrategy.DISABLED)
+    return _apply_module_decorator(class_or_strategy, CachingStrategy.DISABLED)

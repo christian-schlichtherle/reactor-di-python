@@ -32,7 +32,7 @@ class ConnectionManager:
 class ConnectionApp:
     config: ConnectionConfig
     manager: ConnectionManager
-    connections: int  # from pool
+    connections: int  # from manager
 
     def connect(self) -> str:
         return self.manager.connect()

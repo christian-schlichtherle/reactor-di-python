@@ -64,9 +64,11 @@ print(db_service._timeout)   # → 30 (from config.timeout)
 The `examples/` directory contains testable examples that demonstrate all the features shown in this README:
 
 - **`quick_start.py`** - The complete Quick Start example above, converted to testable format
+- **`quick_start_advanced.py`** - Advanced quick start with inheritance patterns
 - **`caching_strategy.py`** - Demonstrates `CachingStrategy.DISABLED` vs `CachingStrategy.NOT_THREAD_SAFE`
-- **`multiple_decorators.py`** - Shows using multiple `@law_of_demeter` decorators on the same class
+- **`stacked_decorators.py`** - Shows using multiple `@law_of_demeter` decorators on the same class
 - **`custom_prefix.py`** - Demonstrates custom prefix options (`prefix=''`, `prefix='cfg_'`, etc.)
+- **`side_effects.py`** - Tests side effect isolation during decoration
 
 ### Running Examples
 
@@ -82,14 +84,14 @@ All examples are automatically tested as part of the CI pipeline to ensure they 
 
 ## Architecture
 
-Reactor DI uses a **modular file structure** for clean separation of concerns:
+Reactor DI uses a **code generation approach** with clean separation of concerns:
 
 - **`module.py`** - The `@module` decorator for dependency injection containers
 - **`law_of_demeter.py`** - The `@law_of_demeter` decorator for property forwarding
 - **`caching.py`** - Caching strategies (`CachingStrategy.DISABLED`, `CachingStrategy.NOT_THREAD_SAFE`)
-- **`type_utils.py`** - Shared type checking utilities used across decorators
+- **`type_utils.py`** - Simplified type checking utilities (Python 3.8+ stable APIs)
 
-The decorators work together seamlessly - `@law_of_demeter` creates forwarding properties that `@module` recognizes during dependency validation, enabling clean cooperation without special configuration.
+The decorators work together through simple `hasattr` checks - `@law_of_demeter` creates forwarding properties that `@module` recognizes as already implemented, enabling clean cooperation without complex validation logic.
 
 ## Advanced Usage
 
@@ -183,30 +185,19 @@ class Service:
 
 ### Type Utilities
 
-#### is_type_compatible(provided_type: Any, required_type: Any) -> bool
+The simplified type utilities leverage Python 3.8+ stable type hint APIs:
 
-Checks if a provided type is compatible with a required type for dependency injection.
+#### get_alternative_names(name: str, prefix: str = "_") -> List[str]
 
-**Logic:**
-1. Exact type match: `provided_type == required_type`
-2. String annotations: Name-based comparison
-3. None types: Must both be None  
-4. Class inheritance: `issubclass(provided_type, required_type)`
-5. Complex types: Conservative fallback to True
+Generates alternative names for dependency mapping (e.g., `_config` → `config`).
 
-#### safe_get_type_hints(cls: Type[Any]) -> Dict[str, Any]
+#### has_constructor_assignment(class_type: Type[Any], attr_name: str) -> bool
 
-Safely retrieves type hints with fallback to `__annotations__` on error.
+Detects if a constructor assigns to an attribute using regex source analysis.
 
-#### get_all_type_hints(cls: Type[Any]) -> Dict[str, Any]
+#### is_primitive_type(attr_type: Type[Any]) -> bool
 
-Collects type hints from entire inheritance hierarchy (MRO).
-
-#### needs_implementation(cls: Type[Any], attr_name: str) -> bool
-
-Determines if an attribute needs implementation by checking:
-- Has annotation but no implementation
-- Is an abstract method/property in inheritance hierarchy
+Identifies primitive types (int, str, bool, etc.) that shouldn't be auto-instantiated.
 
 ### Enums
 
@@ -237,7 +228,7 @@ This project uses modern Python tooling and best practices:
 ### Running Tests
 
 ```bash
-# Run all tests with coverage (20 tests in examples/, 71.95% coverage)
+# Run all tests with coverage (20 tests in examples/, ~72% coverage)
 ./scripts/test-with-coverage.sh
 
 # Run tests without coverage (for debugging)

@@ -80,17 +80,18 @@ The two decorators work together seamlessly without special configuration:
 - **Validation Integration**: `@module` validates only unimplemented dependencies, allowing clean cooperation
 
 ### Type System Integration (`type_utils.py`)
-Shared utilities that enable type-safe DI across both decorators:
-- **`get_all_type_hints()`**: Traverses entire Method Resolution Order (MRO) to collect annotations
-- **`needs_implementation()`**: Determines if attributes need synthesis by checking full inheritance hierarchy
-- **`is_type_compatible()`**: Validates type compatibility for dependency injection
-- **Conservative Approach**: Handles complex types gracefully rather than failing
+Simplified utilities that enable type-safe DI across both decorators:
+- **`get_alternative_names()`**: Generates name variations for dependency mapping (e.g., `_config` → `config`)
+- **`has_constructor_assignment()`**: Detects attribute assignments in constructor source code
+- **`is_primitive_type()`**: Identifies primitive types that shouldn't be auto-instantiated
+- **Internal Constants**: `DEPENDENCY_MAP_ATTR`, `PARENT_INSTANCE_ATTR`, `SETUP_DEPENDENCIES_ATTR` for tracking
 
 ### Key Architectural Patterns
 - **Mediator Pattern**: `@module` acts as central coordinator for all dependencies
 - **Factory Pattern**: Generates `@cached_property` or `property` methods for object creation
-- **MRO Traversal**: Proper handling of complex inheritance hierarchies
+- **Deferred Resolution**: `_DeferredProperty` class handles runtime attribute forwarding
 - **Pluggable Caching**: `CachingStrategy` enum applied at decoration time
+- **Simplified Error Handling**: Removed unnecessary defensive programming for Python 3.8+ stable APIs
 
 ## Testing Strategy
 
@@ -126,14 +127,16 @@ Shared utilities that enable type-safe DI across both decorators:
 ## Key Development Insights
 
 ### Understanding Decorator Interaction
-- Both decorators use `type_utils.py` for consistent type handling
-- `@law_of_demeter` creates properties that `@module` recognizes during validation
-- Test decorator cooperation in `test_integration.py` for complex scenarios
+- Both decorators use simplified type checking from `type_utils.py`
+- `@law_of_demeter` creates forwarding properties using `_DeferredProperty` for runtime resolution
+- `@module` skips attributes already handled by `@law_of_demeter` through `hasattr` checks
+- Decorator cooperation happens naturally without complex validation logic
 
 ### Architectural Decisions
 - **Explicit Annotations Required**: Only annotated attributes are forwarded/synthesized
 - **Decoration-Time Creation**: Properties exist at class definition time for better IDE support
-- **Conservative Type Validation**: Allows complex types rather than failing on edge cases
+- **Simplified Validation**: Direct type checking without excessive error handling
+- **Greedy vs Reluctant**: `@module` raises errors for unsatisfied dependencies, `@law_of_demeter` silently skips
 
 ## Key Features
 
@@ -145,6 +148,14 @@ Shared utilities that enable type-safe DI across both decorators:
 - Secure PyPI deployment with trusted publishing
 
 ## Recent Updates
+
+### Code Simplification (Latest)
+- Removed complex parent resolution logic from `@law_of_demeter`
+- Made `DeferredProperty` private (`_DeferredProperty`) to indicate internal use
+- Fixed bug in `get_alternative_names` using `append` instead of `extend`
+- Simplified module.py with clearer error messages and removed unused imports
+- Streamlined type checking by removing unnecessary try-except blocks
+- Uses walrus operator (`:=`) for cleaner conditionals (Python 3.8+)
 
 ### Python 3.8 Compatibility
 - Added `from __future__ import annotations` to support modern type syntax
