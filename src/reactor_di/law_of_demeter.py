@@ -12,7 +12,8 @@ from .type_utils import (
     PARENT_INSTANCE_ATTR,
     SETUP_DEPENDENCIES_ATTR,
     get_alternative_names,
-    has_constructor_assignment, safely_get_type_hints,
+    has_constructor_assignment,
+    safely_get_type_hints,
 )
 
 

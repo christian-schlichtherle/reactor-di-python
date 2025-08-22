@@ -17,7 +17,8 @@ from .type_utils import (
     SETUP_DEPENDENCIES_ATTR,
     is_primitive_type,
     needs_implementation,
-    should_create_dependency, safely_get_type_hints,
+    safely_get_type_hints,
+    should_create_dependency,
 )
 
 
