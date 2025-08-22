@@ -6,7 +6,7 @@ behavior, silently skipping attributes that cannot be resolved.
 """
 
 import inspect
-from typing import Any, Callable, Type
+from typing import Any, Callable, Type, get_type_hints
 
 from .type_utils import (
     DEPENDENCY_MAP_ATTR,
@@ -14,7 +14,6 @@ from .type_utils import (
     SETUP_DEPENDENCIES_ATTR,
     get_alternative_names,
     has_constructor_assignment,
-    safely_get_type_hints,
 )
 
 
@@ -91,8 +90,7 @@ class DeferredProperty:
                     setattr(instance, self.base_ref, base_obj)
                 else:
                     # Fallback to type hints checking
-                    cls = type(parent)
-                    parent_hints = safely_get_type_hints(cls)
+                    parent_hints = get_type_hints(type(parent))
 
                     # Try exact match first
                     if self.base_ref in parent_hints:
@@ -168,10 +166,7 @@ def _can_resolve_attribute(
         True
     """
     # First, check if the base reference exists in class annotations
-    hints = safely_get_type_hints(cls)
-    if base_ref in hints:
-        base_type = hints[base_ref]
-
+    if base_type := get_type_hints(cls).get(base_ref):
         if hasattr(base_type, target_attr_name):
             return True
         if isinstance(base_type, str):
@@ -179,7 +174,7 @@ def _can_resolve_attribute(
         if not inspect.isclass(base_type):
             return True  # Use deferred resolution for complex types
 
-        target_hints = safely_get_type_hints(base_type)
+        target_hints = get_type_hints(base_type)
         if target_attr_name in target_hints:
             return True
 
@@ -191,42 +186,34 @@ def _can_resolve_attribute(
 
     # Try to infer the type by looking at constructor parameters
     if hasattr(cls, "__init__"):
-        try:
-            sig = inspect.signature(cls.__init__)
-            for param_name, param in sig.parameters.items():
-                if param_name == "self":
-                    continue
+        sig = inspect.signature(cls.__init__)
+        for param_name, param in sig.parameters.items():
+            if param_name == "self":
+                continue
 
-                # Check if this parameter might correspond to our base_ref
-                alt_names = get_alternative_names(base_ref)
-                if param_name == base_ref or param_name in alt_names:
-                    if param.annotation != inspect.Parameter.empty:
-                        # We found a type annotation for the parameter
-                        param_type = param.annotation
+            # Check if this parameter might correspond to our base_ref
+            alt_names = get_alternative_names(base_ref)
+            if param_name == base_ref or param_name in alt_names:
+                if param.annotation != inspect.Parameter.empty:
+                    # We found a type annotation for the parameter
+                    param_type = param.annotation
 
-                        # Now check if the target attribute exists on this type
-                        try:
-                            if inspect.isclass(param_type):
-                                target_hints = safely_get_type_hints(param_type)
-                                if target_attr_name in target_hints:
-                                    return True
-                                if hasattr(param_type, target_attr_name):
-                                    return True
+                    # Now check if the target attribute exists on this type
+                    if inspect.isclass(param_type):
+                        target_hints = get_type_hints(param_type)
+                        if target_attr_name in target_hints:
+                            return True
+                        if hasattr(param_type, target_attr_name):
+                            return True
 
-                                # Check constructor assignments
-                                if has_constructor_assignment(
-                                    param_type, target_attr_name
-                                ):
-                                    return True
-                        except (TypeError, OSError):
-                            pass
-                    else:
-                        # No type annotation, but parameter exists
-                        # This is more speculative, but if the user explicitly specified
-                        # this base_ref, we should trust them and use deferred resolution
-                        return True
-        except (TypeError, ValueError):
-            pass
+                        # Check constructor assignments
+                        if has_constructor_assignment(param_type, target_attr_name):
+                            return True
+                else:
+                    # No type annotation, but parameter exists
+                    # This is more speculative, but if the user explicitly specified
+                    # this base_ref, we should trust them and use deferred resolution
+                    return True
 
     # If we can't determine the type, be conservative
     return False
@@ -273,7 +260,7 @@ def law_of_demeter(
             The decorated class with forwarding properties.
         """
         # Process each annotated attribute
-        for attr_name, attr_type in safely_get_type_hints(cls).items():
+        for attr_name, attr_type in get_type_hints(cls).items():
             # Special case: if this is the base reference itself, it must not get forwarded
             if attr_name == base_ref:
                 continue

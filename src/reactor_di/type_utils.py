@@ -14,7 +14,7 @@ Key features:
 
 import inspect
 import re
-from typing import Any, Dict, Final, List, Tuple, Type, get_type_hints
+from typing import Any, Final, List, Tuple, Type
 
 # Constants for internal attribute names
 DEPENDENCY_MAP_ATTR: Final[str] = "_reactor_di_dependency_map"
@@ -34,14 +34,6 @@ PRIMITIVE_EQUIVALENT_TYPES: Final[Tuple[Type[Any], ...]] = (
     set,
     frozenset,
 )
-
-
-def safely_get_type_hints(base: Type[Any]) -> Dict[str, Any]:
-    """Safely get type hints from a base class."""
-    try:
-        return get_type_hints(base)
-    except (TypeError, NameError, AttributeError, SyntaxError):
-        return {}
 
 
 def needs_implementation(cls: Type[Any], attr_name: str) -> bool:
@@ -146,27 +138,17 @@ def has_constructor_assignment(class_type: Type[Any], attr_name: str) -> bool:
 
     Args:
         class_type: The class to check.
-        attr_name: The attribute name to look for in constructor.
+        attr_name: The attribute name to look for in the constructor.
 
     Returns:
         True if constructor assigns to the attribute, False otherwise.
-        Returns False for built-in classes, compiled extensions, and other
-        cases where source code inspection fails.
     """
-    if not hasattr(class_type, "__init__"):
-        return False
+    # Get the first parameter name from the constructor signature, which is usually "self", but could be anything
+    self = next(iter(inspect.signature(class_type.__init__).parameters))
 
-    try:
-        # Get the first parameter name from the constructor signature, which is usually "self", but could be anything
-        self = next(iter(inspect.signature(class_type.__init__).parameters))
-
-        source = inspect.getsource(class_type.__init__)
-        # Use combined regex pattern to match both assignment and type annotation
-        # Matches: self.attr = value OR self.attr: Type = value
-        return bool(
-            re.search(
-                rf"{re.escape(self)}\s*\.\s*{re.escape(attr_name)}\s*[=:]", source
-            )
-        )
-    except (OSError, TypeError, ValueError):
-        return False
+    source = inspect.getsource(class_type.__init__)
+    # Use combined regex pattern to match both assignment and type annotation
+    # Matches: self.attr = value OR self.attr: Type = value
+    return bool(
+        re.search(rf"{re.escape(self)}\s*\.\s*{re.escape(attr_name)}\s*[=:]", source)
+    )

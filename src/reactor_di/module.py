@@ -8,7 +8,7 @@ raising errors for attributes that cannot be satisfied.
 from __future__ import annotations
 
 from functools import cached_property
-from typing import Any, Callable, Type, Union
+from typing import Any, Callable, Type, Union, get_type_hints
 
 from .caching import CachingStrategy
 from .type_utils import (
@@ -17,7 +17,6 @@ from .type_utils import (
     SETUP_DEPENDENCIES_ATTR,
     is_primitive_type,
     needs_implementation,
-    safely_get_type_hints,
     should_create_dependency,
 )
 
@@ -58,9 +57,8 @@ def _create_factory_method(
                 instance.__dict__[PARENT_INSTANCE_ATTR] = self_instance
 
                 # Set up lazy dependency resolution using a deferred approach
-                instance_hints = safely_get_type_hints(attr_type)
-                cls = type(self_instance)
-                parent_hints = safely_get_type_hints(cls)
+                instance_hints = get_type_hints(attr_type)
+                parent_hints = get_type_hints(type(self_instance))
 
                 # Store dependency mapping for later resolution
                 dependency_map = {}
@@ -139,10 +137,8 @@ def _apply_module_decorator(
         TypeError: If any dependency cannot be satisfied (greedy behavior).
     """
     # Get all type hints for the class
-    hints = safely_get_type_hints(cls)
-
     # Process each annotated attribute
-    for attr_name, attr_type in hints.items():
+    for attr_name, attr_type in get_type_hints(cls).items():
         # Skip if this attribute doesn't need implementation
         if not needs_implementation(cls, attr_name):
             continue
