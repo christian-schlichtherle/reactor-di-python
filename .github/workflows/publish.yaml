@@ -13,8 +13,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install uv
-        uses: astral-sh/setup-uv@v6
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.8'
       - name: Install dependencies
         run: uv sync --all-groups
       - name: Build package
@@ -24,4 +25,4 @@ jobs:
 name: Publish to PyPI
 on:
   push:
-    tags: ['v*.*.*']
+    tags: [ 'v*.*.*' ]
