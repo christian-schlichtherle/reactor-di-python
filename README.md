@@ -228,11 +228,11 @@ This project uses modern Python tooling and best practices:
 ### Running Tests
 
 ```bash
-# Run all tests with coverage (20 tests in examples/, ~72% coverage)
-./scripts/test-with-coverage.sh
-
-# Run tests without coverage (for debugging)
+# Run tests without coverage (default, fast for development)
 uv run pytest
+
+# Run tests with coverage and HTML/terminal reports
+uv run pytest --cov
 
 # Run example tests
 uv run pytest examples/                     # Run all examples as tests (20 tests)
@@ -243,12 +243,13 @@ uv run pytest examples/quick_start.py       # Quick start examples (4 tests)
 
 ### Debugging in PyCharm
 
-The project is configured to separate coverage settings from PyCharm debugging:
+The project is optimized for fast development and debugging:
 
-1. **For debugging**: PyCharm uses the default `pyproject.toml` configuration without coverage
-2. **For coverage**: Use `./scripts/test-with-coverage.sh` or `pytest -c pytest-cov.ini`
+1. **Default**: Tests run without coverage for fast feedback and debugging
+2. **Coverage analysis**: Use `--cov` flag when you need coverage reports
+3. **Coverage threshold**: Set to 90% to maintain high code quality (when coverage is enabled)
 
-This ensures breakpoints work correctly in PyCharm while still maintaining coverage reports for CI/CD.
+This configuration ensures breakpoints work reliably and tests run quickly during development.
 
 ### Code Quality
 
@@ -270,7 +271,7 @@ uv run black src tests examples
 2. Create a feature branch
 3. Make your changes
 4. Add tests for new functionality with meaningful assertions
-5. Ensure all tests pass and 100% coverage is maintained  
+5. Ensure all tests pass and 90% coverage is maintained  
 6. Verify realistic code scenarios rather than mocking impossible edge cases
 7. Submit a pull request
 

@@ -35,8 +35,8 @@ jobs:
       - name: Run type checking
         run: uv run mypy src
 
-      - name: Run tests
-        run: uv run pytest -c pytest-cov.ini
+      - name: Run tests with coverage
+        run: uv run pytest --cov
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5

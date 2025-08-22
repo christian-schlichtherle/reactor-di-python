@@ -21,9 +21,8 @@ A code generator for dependency injection (DI) in Python based on the mediator a
 - `uv remove <package>` - Remove a dependency
 
 ### Testing
-- `./scripts/test-with-coverage.sh` - Run all tests with coverage (20 tests from examples/)
-- `uv run pytest` - Run tests without coverage (useful for debugging)
-- `uv run pytest -c pytest-cov.ini` - Run tests with coverage configuration
+- `uv run pytest` - Run tests without coverage (fast, for development)
+- `uv run pytest --cov` - Run tests with coverage and HTML/terminal reports
 - `uv run pytest examples/` - Run testable examples (20 tests)
 - `uv run pytest -m "not slow"` - Skip slow tests
 
@@ -95,7 +94,7 @@ Simplified utilities that enable type-safe DI across both decorators:
 
 ## Testing Strategy
 
-- **Coverage Achievement**: ~72% test coverage (focused on realistic scenarios)
+- **Coverage Achievement**: 90% test coverage requirement (focused on realistic scenarios)
 - **Framework**: pytest with pytest-cov
 - **Matrix Testing**: Python 3.8, 3.9, 3.10, 3.11, 3.12, 3.13
 - **Test Architecture**: 
@@ -105,8 +104,9 @@ Simplified utilities that enable type-safe DI across both decorators:
 - **Realistic Testing**: Remove unrealistic defensive code rather than mock impossible scenarios
 
 ### PyCharm Testing Configuration
-- **Debugging**: PyCharm uses `pyproject.toml` without coverage for proper breakpoint support
-- **Coverage Testing**: Use `./scripts/test-with-coverage.sh` or `pytest -c pytest-cov.ini`
+- **Default**: PyCharm runs tests without coverage for fast feedback and debugging
+- **Coverage Testing**: Use `--cov` flag to enable coverage when needed
+- **Coverage Threshold**: Set to 90% (fail_under = 90) when coverage is enabled
 - **Setuptools Requirement**: Added to dev dependencies for PyCharm's pytest runner compatibility
 
 ## CI/CD Pipeline
@@ -163,7 +163,8 @@ Simplified utilities that enable type-safe DI across both decorators:
 - Maintained use of `Type[Any]` and `Union[...]` for broader compatibility
 
 ### Testing Infrastructure
-- Separated coverage configuration to enable PyCharm debugging
-- Added `pytest-cov.ini` for CI/CD coverage requirements  
-- Created `scripts/test-with-coverage.sh` for convenient coverage runs
+- Unified configuration in `pyproject.toml` with coverage as opt-in via `--cov`
+- Coverage reports (HTML and terminal) generated when `--cov` flag is used
+- Coverage threshold set to 90% for higher quality standards
+- Optimized for fast development cycles with coverage disabled by default
 - Added setuptools to dev dependencies for PyCharm's pytest runner
