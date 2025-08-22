@@ -42,6 +42,8 @@ def test_side_effects():
     """Test that side effects are properly handled."""
 
     app = ConnectionApp()
+    assert app.connections == 0
+    assert url_access == 0
 
     assert app.connect() == "schema://authority/path?query=value#fragment"
     assert app.connections == 1
