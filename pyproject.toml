@@ -1,7 +1,3 @@
-[build-system]
-build-backend = "hatchling.build"
-requires = ["hatchling"]
-
 [dependency-groups]
 dev = [
     "black>=24.0.0",
@@ -31,12 +27,12 @@ classifiers = [
 ]
 dependencies = []
 description = "A code generator for dependency injection (DI) in Python which is based on the mediator and factory patterns"
+dynamic = ["version"]
 keywords = ["dependency-injection", "di", "code-generation", "mediator", "factory"]
 license = {text = "MIT"}
 name = "reactor-di"
 readme = "README.md"
 requires-python = ">=3.8"
-version = "0.1.1"
 
 [project.urls]
 Homepage = "https://github.com/christian-schlichtherle/reactor-di-python"
@@ -170,3 +166,5 @@ ignore = [
     "SIM",
     "T20",
 ]
+
+[tool.setuptools-scm]
