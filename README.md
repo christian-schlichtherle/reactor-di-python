@@ -222,7 +222,7 @@ This project uses modern Python tooling and best practices:
 1. Clone the repository
 2. Install dependencies:
    ```bash
-   uv sync --all-groups
+   uv sync
    ```
 
 ### Running Tests

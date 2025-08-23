@@ -11,7 +11,7 @@ A code generator for dependency injection (DI) in Python based on the mediator a
 - **Python Version**: 3.9 for development (requires 3.8+ due to `@cached_property`)
 - **Package Manager**: `uv` for dependency management
 - **Project Layout**: Modern src-layout structure
-- **Build System**: `hatchling` with `pyproject.toml`
+- **Build System**: `hatchling` with `hatch-vcs` for automatic git tag versioning
 
 ## Common Commands
 
@@ -27,10 +27,10 @@ A code generator for dependency injection (DI) in Python based on the mediator a
 - `uv run pytest -m "not slow"` - Skip slow tests
 
 ### Code Quality
-- `uv run ruff check src tests examples` - Run linting (configured for Python 3.8+ compatibility)
+- `uv run ruff check src tests examples` - Run linting (style, imports, complexity, Python idioms)
 - `uv run black --check src tests examples` - Check code formatting
-- `uv run black src tests examples` - Format code
-- `uv run mypy src` - Run type checking
+- `uv run black src tests examples` - Format code  
+- `uv run mypy src` - Run static type checking (type safety, None checks, function signatures)
 
 ### Building and Publishing
 - `uv build` - Build package for distribution
@@ -107,20 +107,25 @@ Simplified utilities that enable type-safe DI across both decorators:
 - **Single Dependency Group**: Combined dev tools for simplified management
 - **Coverage Testing**: Use `--cov` flag to enable coverage when needed
 - **Coverage Threshold**: Set to 90% (fail_under = 90) when coverage is enabled
-- **Essential Tools Only**: Black, mypy, pytest-cov, pytest, ruff
+- **Essential Tools Only**: 
+  - **black**: Code formatting
+  - **mypy**: Static type checking  
+  - **pytest-cov**: Test coverage
+  - **pytest**: Testing framework
+  - **ruff**: Linting and style checks
 
 ## CI/CD Pipeline
 
 - **GitHub Actions**: Matrix testing across Python versions
 - **Trusted Publishing**: Secure PyPI deployment without API keys
-- **Quality Gates**: Tests, linting, type checking must pass
+- **Quality Gates**: Tests, linting (ruff), formatting (black), and type checking (mypy) must pass
 - **Automatic Deployment**: Triggered on git tags (v*)
 
 ## Development Workflow
 
 1. Make changes in `src/reactor_di/`
 2. Add/update tests in `tests/` and examples in `examples/`
-3. Run quality checks: `uv run pytest --cov && uv run ruff check src tests examples && uv run mypy src`
+3. Run quality checks: `uv run pytest --cov && uv run ruff check src tests examples && uv run black --check src tests examples && uv run mypy src`
 4. Update documentation if needed
 5. Commit and push (CI will validate)
 
@@ -140,11 +145,12 @@ Simplified utilities that enable type-safe DI across both decorators:
 
 ## Key Features
 
-- Modern Python packaging with pyproject.toml
+- Modern Python packaging with hatchling build backend
+- Automatic versioning from git tags via hatch-vcs
 - Comprehensive testing with coverage enforcement
 - Automated CI/CD with GitHub Actions
-- Type safety with mypy
-- Code quality with ruff and black (configured for Python 3.8+ compatibility)
+- Static type checking with mypy for type safety and None checks
+- Code quality with ruff (linting) and black (formatting) - configured for Python 3.8+ compatibility
 - Secure PyPI deployment with trusted publishing
 
 ## Recent Updates
@@ -168,3 +174,15 @@ Simplified utilities that enable type-safe DI across both decorators:
 - Coverage threshold set to 90% for higher quality standards
 - Minimal pytest configuration focused on essential functionality
 - Streamlined dependency footprint with only essential tools
+
+### Build System (Latest)
+- Switched from setuptools to hatchling for modern, faster builds
+- Automatic versioning from git tags using hatch-vcs
+- No version files needed - version determined at build time from git
+- Cleaner configuration with better defaults
+
+### Tool Clarification
+- **ruff**: Fast linter for code style, imports, complexity, and Python idioms
+- **mypy**: Static type checker for type safety, None checks, and function signatures
+- **black**: Code formatter for consistent code style
+- Both ruff and mypy are needed as they serve complementary purposes
