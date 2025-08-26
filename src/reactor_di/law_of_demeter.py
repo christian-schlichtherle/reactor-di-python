@@ -26,7 +26,6 @@ class _DeferredProperty:
         self,
         base_ref: str,
         target_attr_name: str,
-        expected_type: Any,
     ):
         """Initialize deferred property.
 
@@ -37,8 +36,6 @@ class _DeferredProperty:
         """
         self.base_ref = base_ref
         self.target_attr_name = target_attr_name
-        self.expected_type = expected_type
-        self._resolved_property = None
 
     def __get__(self, instance: Any, owner: Type[Any]) -> Any:
         """Get the forwarded attribute value.
@@ -196,7 +193,7 @@ def law_of_demeter(
                 continue
 
             # Always use deferred resolution to avoid recursion issues
-            deferred_prop = _DeferredProperty(base_ref, target_attr_name, attr_type)
+            deferred_prop = _DeferredProperty(base_ref, target_attr_name)
             setattr(class_type, attr_name, deferred_prop)
 
         return class_type
