@@ -101,3 +101,27 @@ def has_constructor_assignment(class_type: Type[Any], attr_name: str) -> bool:
     return bool(
         re.search(rf"{re.escape(self)}\s*\.\s*{re.escape(attr_name)}\s*[=:]", source)
     )
+
+
+def pure_hasattr(obj: Any, attr_name: str) -> bool:
+    """Check if an attribute exists without side effects like triggering descriptors/properties."""
+    try:
+        if attr_name in obj.__dict__:
+            return True
+    except AttributeError:
+        pass
+
+    for cls in type(obj).__mro__:
+        try:
+            if attr_name in cls.__dict__:
+                return True
+        except AttributeError:
+            pass
+
+        try:
+            if attr_name in cls.__slots__:  # type: ignore[attr-defined]
+                return True
+        except AttributeError:
+            pass
+
+    return False

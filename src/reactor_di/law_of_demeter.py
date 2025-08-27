@@ -179,7 +179,7 @@ def law_of_demeter(
             The decorated class with forwarding properties.
         """
         # Process each annotated attribute
-        for attr_name, attr_type in get_type_hints(class_type).items():
+        for attr_name in get_type_hints(class_type):
             # Special case: if this is the base reference itself, it must not get forwarded
             if attr_name == base_ref:
                 continue

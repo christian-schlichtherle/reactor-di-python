@@ -28,9 +28,14 @@ class ConnectionManager:
 @module(CachingStrategy.NOT_THREAD_SAFE)
 @law_of_demeter("manager", prefix="")
 class ConnectionApp:
-    config: ConnectionConfig
     manager: ConnectionManager
     connections: int  # from manager
+    config_init = False
+
+    @cached_property
+    def config(self) -> ConnectionConfig:
+        ConnectionApp.config_init = True
+        return ConnectionConfig()
 
     def connect(self) -> str:
         return self.manager.connect()
@@ -42,8 +47,10 @@ def test_side_effects():
     app = ConnectionApp()
     assert app.connections == 0
     assert ConnectionConfig.url_access == 0
+    assert ConnectionApp.config_init is False
 
     assert app.connect() == "schema://authority/path?query=value#fragment"
+    assert ConnectionApp.config_init is True
     assert app.connections == 1
     assert ConnectionConfig.url_access == 1
 

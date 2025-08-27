@@ -14,11 +14,12 @@ from .caching import CachingStrategy
 from .type_utils import (
     SETUP_DEPENDENCIES_ATTR,
     is_primitive_type,
+    pure_hasattr,
 )
 
 
 def _create_factory_method(
-        attr_type: Type[Any], caching_strategy: CachingStrategy
+    attr_type: Type[Any], caching_strategy: CachingStrategy
 ) -> Union[property, cached_property[Any]]:
     """Create a factory method for a dependency.
 
@@ -44,23 +45,17 @@ def _create_factory_method(
         # Create the instance without trying to resolve any dependencies.
         # The dependencies will be resolved lazily when accessed.
         instance = attr_type()
-
-        # Set up the lazy dependency resolution using a deferred approach
-        instance_hints = get_type_hints(attr_type)
-        module_hints = get_type_hints(type(module_instance))
-
-        # Store dependency mapping for later resolution
         dependency_map = {}
 
         # For each dependency needed by the instance
-        for dep_name in instance_hints:
-            # Direct match: dependency name matches parent attribute
-            if dep_name in module_hints:
+        for dep_name in get_type_hints(attr_type):
+            # Direct match: dependency name matches module_instance attribute
+            if pure_hasattr(module_instance, dep_name):
                 dependency_map[dep_name] = dep_name
-            # Convention match: _config maps to config in parent
+            # Convention match: _config maps to config in module_instance
             elif dep_name.startswith("_"):
                 alt_name = dep_name[1:]  # Remove leading underscore
-                if alt_name in module_hints:
+                if pure_hasattr(module_instance, alt_name):
                     dependency_map[dep_name] = alt_name
 
         # Store the dependency mapping for later use
@@ -104,7 +99,7 @@ def _create_factory_method(
 
 
 def _apply_module_decorator(
-        class_type: Type[Any], caching_strategy: CachingStrategy
+    class_type: Type[Any], caching_strategy: CachingStrategy
 ) -> Type[Any]:
     """Apply the module decorator to a class.
 
@@ -154,7 +149,7 @@ def _apply_module_decorator(
 
 
 def module(
-        class_or_strategy: Union[Type[Any], CachingStrategy, None] = None, /
+    class_or_strategy: Union[Type[Any], CachingStrategy, None] = None, /
 ) -> Union[Type[Any], Callable[[Type[Any]], Type[Any]]]:
     """Module decorator for dependency injection.
 
