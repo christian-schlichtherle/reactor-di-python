@@ -9,14 +9,12 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
         run: uv sync
-      - name: Run linting
+      - name: Run formatting, linting and type checking
         if: inputs.run-linting
         run: |
-          uv run ruff check src tests examples
-          uv run black --check src tests examples
-      - name: Run type checking
-        if: inputs.run-linting
-        run: uv run mypy src
+          uv run black --check examples src tests
+          uv run ruff check examples src tests
+          uv run mypy src
       - name: Run tests without coverage
         if: '!inputs.run-coverage'
         run: uv run pytest
