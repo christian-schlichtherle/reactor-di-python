@@ -12,15 +12,13 @@ from typing import Any, Callable, Type, Union, get_type_hints
 
 from .caching import CachingStrategy
 from .type_utils import (
-    DEPENDENCY_MAP_ATTR,
-    PARENT_INSTANCE_ATTR,
     SETUP_DEPENDENCIES_ATTR,
     is_primitive_type,
 )
 
 
 def _create_factory_method(
-    attr_type: Type[Any], caching_strategy: CachingStrategy
+        attr_type: Type[Any], caching_strategy: CachingStrategy
 ) -> Union[property, cached_property[Any]]:
     """Create a factory method for a dependency.
 
@@ -36,7 +34,7 @@ def _create_factory_method(
         A property or cached_property that creates the dependency.
     """
 
-    def factory(self_instance: Any) -> Any:
+    def factory(module_instance: Any) -> Any:
         """Factory function that creates the dependency.
 
         Instantiates the dependency and sets up lazy resolution for its
@@ -47,60 +45,53 @@ def _create_factory_method(
         # The dependencies will be resolved lazily when accessed.
         instance = attr_type()
 
-        # Set up lazy dependency resolution by setting a reference back to parent
-        # This allows the created instance to access parent dependencies when needed
-        if hasattr(instance, "__dict__"):
-            instance.__dict__[PARENT_INSTANCE_ATTR] = self_instance
+        # Set up the lazy dependency resolution using a deferred approach
+        instance_hints = get_type_hints(attr_type)
+        module_hints = get_type_hints(type(module_instance))
 
-            # Set up lazy dependency resolution using a deferred approach
-            instance_hints = get_type_hints(attr_type)
-            parent_hints = get_type_hints(type(self_instance))
+        # Store dependency mapping for later resolution
+        dependency_map = {}
 
-            # Store dependency mapping for later resolution
-            dependency_map = {}
+        # For each dependency needed by the instance
+        for dep_name in instance_hints:
+            # Direct match: dependency name matches parent attribute
+            if dep_name in module_hints:
+                dependency_map[dep_name] = dep_name
+            # Convention match: _config maps to config in parent
+            elif dep_name.startswith("_"):
+                alt_name = dep_name[1:]  # Remove leading underscore
+                if alt_name in module_hints:
+                    dependency_map[dep_name] = alt_name
 
-            # For each dependency needed by the instance
-            for dep_name in instance_hints:
-                # Direct match: dependency name matches parent attribute
-                if dep_name in parent_hints:
-                    dependency_map[dep_name] = dep_name
-                # Convention match: _config maps to config in parent
-                elif dep_name.startswith("_"):
-                    alt_name = dep_name[1:]  # Remove leading underscore
-                    if alt_name in parent_hints:
-                        dependency_map[dep_name] = alt_name
+        # Store the dependency mapping for later use
+        if dependency_map:
+            # Set up the dependencies that are base references (not forwarded)
+            # These are dependencies that would be injected directly
+            # We need to defer this until after the instance is fully created
+            # to avoid circular dependencies
+            def setup_dependencies() -> None:
+                for dep_name, parent_attr in dependency_map.items():
+                    # Resolve the dependency from the parent
+                    dep_value = getattr(module_instance, parent_attr)
+                    setattr(instance, dep_name, dep_value)
 
-            # Store the dependency mapping for later use
-            if dependency_map:
-                instance.__dict__[DEPENDENCY_MAP_ATTR] = dependency_map
+            # Store the setup function to be called later
+            instance.__dict__[SETUP_DEPENDENCIES_ATTR] = setup_dependencies
 
-                # Set up the dependencies that are base references (not forwarded)
-                # These are dependencies that would be injected directly
-                # We need to defer this until after the instance is fully created
-                # to avoid circular dependencies
-                def setup_dependencies() -> None:
-                    for dep_name, parent_attr in dependency_map.items():
-                        # Resolve the dependency from the parent
-                        dep_value = getattr(self_instance, parent_attr)
-                        setattr(instance, dep_name, dep_value)
+            # Also set up __getattribute__ to call setup when dependencies are accessed
+            original_getattribute = instance.__class__.__getattribute__
 
-                # Store the setup function to be called later
-                instance.__dict__[SETUP_DEPENDENCIES_ATTR] = setup_dependencies
+            def patched_getattribute(self: Any, name: str) -> Any:
+                # Call setup if it exists and we're accessing a dependency
+                if name in dependency_map:
+                    setup_func = self.__dict__.get(SETUP_DEPENDENCIES_ATTR)
+                    if setup_func:
+                        setup_func()
+                        del self.__dict__[SETUP_DEPENDENCIES_ATTR]
 
-                # Also set up __getattribute__ to call setup when dependencies are accessed
-                original_getattribute = instance.__class__.__getattribute__
+                return original_getattribute(self, name)
 
-                def patched_getattribute(self: Any, name: str) -> Any:
-                    # Call setup if it exists and we're accessing a dependency
-                    if name in dependency_map:
-                        setup_func = self.__dict__.get(SETUP_DEPENDENCIES_ATTR)
-                        if setup_func:
-                            setup_func()
-                            del self.__dict__[SETUP_DEPENDENCIES_ATTR]
-
-                    return original_getattribute(self, name)
-
-                instance.__class__.__getattribute__ = patched_getattribute
+            instance.__class__.__getattribute__ = patched_getattribute
 
         return instance
 
@@ -113,7 +104,7 @@ def _create_factory_method(
 
 
 def _apply_module_decorator(
-    class_type: Type[Any], caching_strategy: CachingStrategy
+        class_type: Type[Any], caching_strategy: CachingStrategy
 ) -> Type[Any]:
     """Apply the module decorator to a class.
 
@@ -163,7 +154,7 @@ def _apply_module_decorator(
 
 
 def module(
-    class_or_strategy: Union[Type[Any], CachingStrategy, None] = None, /
+        class_or_strategy: Union[Type[Any], CachingStrategy, None] = None, /
 ) -> Union[Type[Any], Callable[[Type[Any]], Type[Any]]]:
     """Module decorator for dependency injection.
 

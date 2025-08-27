@@ -16,8 +16,6 @@ import re
 from typing import Any, Final, List, Tuple, Type
 
 # Constants for internal attribute names
-DEPENDENCY_MAP_ATTR: Final[str] = "_reactor_di_dependency_map"
-PARENT_INSTANCE_ATTR: Final[str] = "_reactor_di_parent_instance"
 SETUP_DEPENDENCIES_ATTR: Final[str] = "_reactor_di_setup_dependencies"
 
 _PRIMITIVE_EQUIVALENT_TYPES: Final[Tuple[Type[Any], ...]] = (
