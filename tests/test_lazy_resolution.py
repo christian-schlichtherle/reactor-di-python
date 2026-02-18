@@ -157,3 +157,19 @@ def test_lazy_resolution_deferred_dep_before_init_raises():
     # After init, it should work
     mod.initialize()
     assert controller._api is mod.api
+
+
+def test_nonexistent_attribute_raises():
+    """Accessing an attribute not in the dependency map must raise AttributeError."""
+    config = AnnotationOnlyConfig(
+        destination_topic_prefix="test-",
+        events_queue="events",
+        host="localhost",
+        port=6379,
+        timeout=300,
+    )
+    mod = DeferredModule(config)
+    controller = mod.controller
+
+    with pytest.raises(AttributeError, match="no_such_attribute"):
+        _ = controller.no_such_attribute
