@@ -105,6 +105,11 @@ def _can_resolve_attribute(
         if hasattr(base_type, target_attr_name):
             return True
 
+        # Check type hints (catches Pydantic/dataclass fields that are
+        # annotations without class-level attributes)
+        if target_attr_name in get_type_hints(base_type):
+            return True
+
         return has_constructor_assignment(base_type, target_attr_name)
 
     # Fall back to constructor parameter analysis

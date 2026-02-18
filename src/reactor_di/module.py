@@ -18,6 +18,24 @@ from .type_utils import (
 )
 
 
+def _module_getattr(self: Any, name: str) -> Any:
+    """Fallback __getattr__ for deferred dependency setup.
+
+    Installed on component classes by the module factory.  Only called
+    when normal attribute lookup fails (i.e. the attribute is not in the
+    instance dict and not a descriptor on the class).  Triggers the
+    deferred setup function which resolves all dependencies at once.
+    """
+    setup_func = self.__dict__.pop(SETUP_DEPENDENCIES_ATTR, None)
+    if setup_func:
+        setup_func()
+        return getattr(self, name)
+    raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+
+
+_module_getattr._reactor_di = True  # type: ignore[attr-defined]
+
+
 def _create_factory_method(
     attr_type: Type[Any], caching_strategy: CachingStrategy
 ) -> Union[property, cached_property[Any]]:
@@ -38,16 +56,15 @@ def _create_factory_method(
     def factory(module_instance: Any) -> Any:
         """Factory function that creates the dependency.
 
-        Instantiates the dependency and sets up lazy resolution for its
-        sub-dependencies through a deferred loading mechanism.
+        Instantiates the dependency and sets up deferred resolution for its
+        sub-dependencies from the module instance.
         """
 
-        # Create the instance without trying to resolve any dependencies.
-        # The dependencies will be resolved lazily when accessed.
         instance = attr_type()
         dependency_map = {}
 
-        # For each dependency needed by the instance
+        # For each dependency needed by the instance, build a mapping
+        # from dep name to module attribute using naming conventions
         for dep_name in get_type_hints(attr_type):
             # Direct match: dependency name matches module_instance attribute
             if pure_hasattr(module_instance, dep_name):
@@ -58,35 +75,27 @@ def _create_factory_method(
                 if pure_hasattr(module_instance, alt_name):
                     dependency_map[dep_name] = alt_name
 
-        # Store the dependency mapping for later use
         if dependency_map:
-            # Set up the dependencies that are base references (not forwarded)
-            # These are dependencies that would be injected directly
-            # We need to defer this until after the instance is fully created
-            # to avoid circular dependencies
+
             def setup_dependencies() -> None:
                 for dep_name, parent_attr in dependency_map.items():
-                    # Resolve the dependency from the parent
                     dep_value = getattr(module_instance, parent_attr)
                     setattr(instance, dep_name, dep_value)
 
-            # Store the setup function to be called later
+            # Store setup function for _DeferredProperty and __getattr__
             instance.__dict__[SETUP_DEPENDENCIES_ATTR] = setup_dependencies
 
-            # Also set up __getattribute__ to call setup when dependencies are accessed
-            original_getattribute = instance.__class__.__getattribute__
-
-            def patched_getattribute(self: Any, name: str) -> Any:
-                # Call setup if it exists and we're accessing a dependency
-                if name in dependency_map:
-                    setup_func = self.__dict__.get(SETUP_DEPENDENCIES_ATTR)
-                    if setup_func:
-                        setup_func()
-                        del self.__dict__[SETUP_DEPENDENCIES_ATTR]
-
-                return original_getattribute(self, name)
-
-            instance.__class__.__getattribute__ = patched_getattribute
+            # Install __getattr__ on the class so that non-descriptor
+            # dependencies (those not handled by _DeferredProperty) trigger
+            # setup on first access.  Unlike __getattribute__, __getattr__
+            # is only called when normal lookup fails, so it doesn't
+            # interfere with existing attributes or descriptors.
+            if not getattr(
+                attr_type.__dict__.get("__getattr__"),
+                "_reactor_di",
+                False,
+            ):
+                attr_type.__getattr__ = _module_getattr
 
         return instance
 
