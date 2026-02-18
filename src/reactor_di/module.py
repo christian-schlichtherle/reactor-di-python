@@ -73,9 +73,23 @@ def _create_factory_method(
         instance = attr_type()
         dependency_map = {}
 
+        # Get dependency names, handling TYPE_CHECKING forward references.
+        # When a component uses `if TYPE_CHECKING:` imports (common for
+        # avoiding circular imports), get_type_hints() fails with NameError
+        # because the referenced type isn't available at runtime.  We only
+        # need annotation *names* here, so falling back to raw __annotations__
+        # from the MRO is safe.
+        try:
+            dep_names = get_type_hints(attr_type)
+        except (NameError, AttributeError, TypeError):
+            dep_names = {}
+            for klass in reversed(attr_type.__mro__):
+                if klass is not object:
+                    dep_names.update(getattr(klass, "__annotations__", {}))
+
         # For each dependency needed by the instance, build a mapping
         # from dep name to module attribute using naming conventions
-        for dep_name in get_type_hints(attr_type):
+        for dep_name in dep_names:
             # Direct match: dependency name matches module_instance attribute
             if pure_hasattr(module_instance, dep_name):
                 dependency_map[dep_name] = dep_name

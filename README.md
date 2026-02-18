@@ -16,6 +16,7 @@ A code generator for dependency injection (DI) in Python which is based on the m
 - **Factory pattern**: Object creation abstraction
 - **Type-safe**: Full type hint support
 - **Lazy dependency resolution**: Dependencies resolved individually on first access, supporting deferred initialization patterns (e.g., async context managers)
+- **TYPE_CHECKING compatible**: Works with `if TYPE_CHECKING:` imports for circular dependency avoidance
 - **Pydantic compatible**: Works with Pydantic BaseSettings/BaseModel annotation-only fields
 - **Python 3.8+ support**: Tested on Python 3.8 through 3.14
 
@@ -86,10 +87,11 @@ All examples are automatically tested as part of the CI pipeline to ensure they 
 
 ## Tests
 
-The `tests/` directory contains regression and unit tests (29 tests):
+The `tests/` directory contains regression and unit tests (31 tests):
 
 - **`test_module_integration.py`** - Module + law_of_demeter integration with annotation-only configs (Pydantic compatibility)
 - **`test_lazy_resolution.py`** - Lazy per-attribute resolution with deferred initialization patterns
+- **`test_forward_ref.py`** - TYPE_CHECKING forward reference handling in module factory
 - **`test_pure_hasattr.py`** - Comprehensive tests for the `pure_hasattr` utility (14 tests)
 - **`test_law_of_demeter.py`** - Law of Demeter decorator tests
 - **`test_side_effects.py`** - Side effects isolation during decoration
@@ -252,7 +254,7 @@ This project uses modern Python tooling and best practices:
 ### Running Tests
 
 ```bash
-# Run all tests (49 tests: 20 examples + 29 regression/unit tests)
+# Run all tests (51 tests: 20 examples + 31 regression/unit tests)
 uv run pytest
 
 # Run tests with coverage and HTML/terminal reports
@@ -265,7 +267,7 @@ uv run pytest examples/custom_prefix.py     # Custom prefix examples (6 tests)
 uv run pytest examples/quick_start.py       # Quick start examples (4 tests)
 
 # Run regression/unit tests only
-uv run pytest tests/                        # Run all regression tests (29 tests)
+uv run pytest tests/                        # Run all regression tests (31 tests)
 ```
 
 ### Debugging in PyCharm

@@ -47,10 +47,11 @@ reactor-di-python/
 │   ├── caching.py              # CachingStrategy enum for component caching
 │   ├── type_utils.py           # Shared type checking utilities
 │   └── py.typed                # Type marker for mypy
-├── tests/                      # Regression and unit tests (29 tests)
+├── tests/                      # Regression and unit tests (31 tests)
 │   ├── __init__.py             # Package initialization
 │   ├── config.py               # Test config fixture
 │   ├── database.py             # Test database fixture
+│   ├── test_forward_ref.py     # TYPE_CHECKING forward reference handling
 │   ├── test_law_of_demeter.py  # Law of Demeter decorator tests
 │   ├── test_lazy_resolution.py # Lazy per-attribute resolution with deferred init
 │   ├── test_module_integration.py # Module + law_of_demeter integration tests
@@ -99,6 +100,7 @@ Simplified utilities that enable type-safe DI across both decorators:
 - **Lazy Per-Attribute Resolution**: Dependencies from `@module` are resolved individually on first access via `__getattr__`, not eagerly all at once
 - **Deferred Resolution**: `_DeferredProperty` class handles runtime attribute forwarding for `@law_of_demeter`
 - **Pluggable Caching**: `CachingStrategy` enum applied at decoration time
+- **Safe Forward Reference Handling**: `get_type_hints()` fallback to raw `__annotations__` for `TYPE_CHECKING` imports
 - **Simplified Error Handling**: Removed unnecessary defensive programming for Python 3.8+ stable APIs
 
 ## Testing Strategy
@@ -107,7 +109,7 @@ Simplified utilities that enable type-safe DI across both decorators:
 - **Framework**: pytest with pytest-cov
 - **Matrix Testing**: Python 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
 - **Test Architecture**:
-  - **Unit/Regression Tests**: Bug regression tests and utility tests in `tests/` (29 tests)
+  - **Unit/Regression Tests**: Bug regression tests and utility tests in `tests/` (31 tests)
   - **Example Tests**: Real-world usage patterns as executable tests in `examples/` (20 tests)
   - **Streamlined Configuration**: Minimal pytest configuration for essential functionality
 - **Test Quality**: Prioritize meaningful assertions over empty coverage metrics
@@ -165,7 +167,14 @@ Simplified utilities that enable type-safe DI across both decorators:
 
 ## Recent Updates
 
-### Bug Fix: Lazy Per-Attribute Dependency Resolution (Latest)
+### Bug Fix: TYPE_CHECKING Forward Reference Handling (Latest)
+- Fixed `NameError` when component classes use `if TYPE_CHECKING:` imports to avoid circular dependencies
+- The module factory's `get_type_hints()` call now falls back to raw `__annotations__` from the MRO when forward references can't be resolved at runtime
+- This is safe because the factory only needs annotation *names* (not resolved types) for dependency mapping
+- Common pattern: `from __future__ import annotations` + `if TYPE_CHECKING: from other_module import SomeClass`
+- Added regression test in `tests/test_forward_ref.py` reproducing the `TYPE_CHECKING` forward reference pattern
+
+### Bug Fix: Lazy Per-Attribute Dependency Resolution
 - Replaced eager all-at-once `setup_dependencies()` closure with lazy per-attribute resolution in `module.py`
 - Dependencies are now stored as a map (`DEPENDENCY_MAP_ATTR` + `MODULE_INSTANCE_ATTR`) on the component instance and resolved individually via `__getattr__` on first access
 - This fixes failures when module `cached_property` methods depend on deferred initialization (e.g., attributes set in `__aenter__` for async context managers)
