@@ -12,24 +12,34 @@ from typing import Any, Callable, Type, Union, get_type_hints
 
 from .caching import CachingStrategy
 from .type_utils import (
-    SETUP_DEPENDENCIES_ATTR,
+    DEPENDENCY_MAP_ATTR,
+    MODULE_INSTANCE_ATTR,
     is_primitive_type,
     pure_hasattr,
 )
 
 
 def _module_getattr(self: Any, name: str) -> Any:
-    """Fallback __getattr__ for deferred dependency setup.
+    """Fallback __getattr__ for lazy per-attribute dependency resolution.
 
     Installed on component classes by the module factory.  Only called
     when normal attribute lookup fails (i.e. the attribute is not in the
-    instance dict and not a descriptor on the class).  Triggers the
-    deferred setup function which resolves all dependencies at once.
+    instance dict and not a descriptor on the class).  Resolves individual
+    dependencies lazily from the module instance, so that accessing one
+    dependency does not trigger resolution of unrelated dependencies.
     """
-    setup_func = self.__dict__.pop(SETUP_DEPENDENCIES_ATTR, None)
-    if setup_func:
-        setup_func()
-        return getattr(self, name)
+    dep_map = self.__dict__.get(DEPENDENCY_MAP_ATTR)
+    if dep_map is not None and name in dep_map:
+        module_ref = self.__dict__[MODULE_INSTANCE_ATTR]
+        parent_attr = dep_map[name]
+        dep_value = getattr(module_ref, parent_attr)
+        # Only remove from map after successful resolution
+        setattr(self, name, dep_value)
+        del dep_map[name]
+        if not dep_map:
+            del self.__dict__[DEPENDENCY_MAP_ATTR]
+            del self.__dict__[MODULE_INSTANCE_ATTR]
+        return dep_value
     raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
 
 
@@ -76,20 +86,17 @@ def _create_factory_method(
                     dependency_map[dep_name] = alt_name
 
         if dependency_map:
-
-            def setup_dependencies() -> None:
-                for dep_name, parent_attr in dependency_map.items():
-                    dep_value = getattr(module_instance, parent_attr)
-                    setattr(instance, dep_name, dep_value)
-
-            # Store setup function for _DeferredProperty and __getattr__
-            instance.__dict__[SETUP_DEPENDENCIES_ATTR] = setup_dependencies
+            # Store dependency map and module reference for lazy resolution.
+            # Each dependency is resolved individually when first accessed,
+            # avoiding eager resolution of all dependencies at once.
+            instance.__dict__[DEPENDENCY_MAP_ATTR] = dict(dependency_map)
+            instance.__dict__[MODULE_INSTANCE_ATTR] = module_instance
 
             # Install __getattr__ on the class so that non-descriptor
             # dependencies (those not handled by _DeferredProperty) trigger
-            # setup on first access.  Unlike __getattribute__, __getattr__
-            # is only called when normal lookup fails, so it doesn't
-            # interfere with existing attributes or descriptors.
+            # lazy resolution on first access.  Unlike __getattribute__,
+            # __getattr__ is only called when normal lookup fails, so it
+            # doesn't interfere with existing attributes or descriptors.
             if not getattr(
                 attr_type.__dict__.get("__getattr__"),
                 "_reactor_di",

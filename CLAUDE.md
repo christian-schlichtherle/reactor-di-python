@@ -47,11 +47,12 @@ reactor-di-python/
 │   ├── caching.py              # CachingStrategy enum for component caching
 │   ├── type_utils.py           # Shared type checking utilities
 │   └── py.typed                # Type marker for mypy
-├── tests/                      # Regression and unit tests (26 tests)
+├── tests/                      # Regression and unit tests (29 tests)
 │   ├── __init__.py             # Package initialization
 │   ├── config.py               # Test config fixture
 │   ├── database.py             # Test database fixture
 │   ├── test_law_of_demeter.py  # Law of Demeter decorator tests
+│   ├── test_lazy_resolution.py # Lazy per-attribute resolution with deferred init
 │   ├── test_module_integration.py # Module + law_of_demeter integration tests
 │   ├── test_pure_hasattr.py    # pure_hasattr utility tests (14 tests)
 │   └── test_side_effects.py    # Side effects isolation tests
@@ -90,12 +91,13 @@ Simplified utilities that enable type-safe DI across both decorators:
 - **`has_constructor_assignment()`**: Detects attribute assignments in constructor source code
 - **`is_primitive_type()`**: Identifies primitive types that shouldn't be auto-instantiated
 - **`pure_hasattr()`**: Checks attribute existence without triggering descriptors or properties
-- **Internal Constants**: `SETUP_DEPENDENCIES_ATTR` for deferred dependency setup tracking
+- **Internal Constants**: `DEPENDENCY_MAP_ATTR`, `MODULE_INSTANCE_ATTR` for lazy dependency resolution; `SETUP_DEPENDENCIES_ATTR` for backward-compatible deferred setup
 
 ### Key Architectural Patterns
 - **Mediator Pattern**: `@module` acts as central coordinator for all dependencies
 - **Factory Pattern**: Generates `@cached_property` or `property` methods for object creation
-- **Deferred Resolution**: `_DeferredProperty` class handles runtime attribute forwarding
+- **Lazy Per-Attribute Resolution**: Dependencies from `@module` are resolved individually on first access via `__getattr__`, not eagerly all at once
+- **Deferred Resolution**: `_DeferredProperty` class handles runtime attribute forwarding for `@law_of_demeter`
 - **Pluggable Caching**: `CachingStrategy` enum applied at decoration time
 - **Simplified Error Handling**: Removed unnecessary defensive programming for Python 3.8+ stable APIs
 
@@ -105,7 +107,7 @@ Simplified utilities that enable type-safe DI across both decorators:
 - **Framework**: pytest with pytest-cov
 - **Matrix Testing**: Python 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
 - **Test Architecture**:
-  - **Unit/Regression Tests**: Bug regression tests and utility tests in `tests/` (26 tests)
+  - **Unit/Regression Tests**: Bug regression tests and utility tests in `tests/` (29 tests)
   - **Example Tests**: Real-world usage patterns as executable tests in `examples/` (20 tests)
   - **Streamlined Configuration**: Minimal pytest configuration for essential functionality
 - **Test Quality**: Prioritize meaningful assertions over empty coverage metrics
@@ -163,12 +165,21 @@ Simplified utilities that enable type-safe DI across both decorators:
 
 ## Recent Updates
 
-### Bug Fixes: Pydantic/Annotation-Only Config Compatibility (Latest)
+### Bug Fix: Lazy Per-Attribute Dependency Resolution (Latest)
+- Replaced eager all-at-once `setup_dependencies()` closure with lazy per-attribute resolution in `module.py`
+- Dependencies are now stored as a map (`DEPENDENCY_MAP_ATTR` + `MODULE_INSTANCE_ATTR`) on the component instance and resolved individually via `__getattr__` on first access
+- This fixes failures when module `cached_property` methods depend on deferred initialization (e.g., attributes set in `__aenter__` for async context managers)
+- Accessing one dependency (e.g., `_config`) no longer triggers resolution of unrelated dependencies (e.g., `_api`, `_namespace`)
+- Failed resolution attempts preserve the map entry for retry after deferred init completes
+- Optimized `_DeferredProperty.__get__` to check `instance.__dict__` directly instead of `hasattr`, avoiding unnecessary `__getattr__` triggers
+- Added 3 regression tests for lazy resolution with deferred initialization patterns
+
+### Bug Fixes: Pydantic/Annotation-Only Config Compatibility
 - Fixed `_can_resolve_attribute` in `law_of_demeter.py` to check `get_type_hints(base_type)` for annotation-only fields (e.g., Pydantic BaseSettings/BaseModel)
 - Replaced class-level `__getattribute__` patching in `module.py` with a safe `__getattr__` fallback (`_module_getattr`), eliminating class pollution across instances
 - `__getattr__` is only called when normal attribute lookup fails, making it safe and idempotent
 - Added `pure_hasattr()` utility in `type_utils.py` to check attribute existence without triggering descriptors or properties
-- Added 26 regression tests in `tests/` covering annotation-only config forwarding, class pollution prevention, and `pure_hasattr` behavior
+- Added regression tests in `tests/` covering annotation-only config forwarding, class pollution prevention, and `pure_hasattr` behavior
 
 ### Code Simplification
 - Removed complex parent resolution logic from `@law_of_demeter`

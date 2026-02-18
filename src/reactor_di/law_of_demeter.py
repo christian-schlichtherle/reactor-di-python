@@ -53,17 +53,15 @@ class _DeferredProperty:
         if instance is None:
             return self
 
-        # Always try to resolve dynamically, don't cache the resolution
-        # This is necessary for attributes that might be created during construction
-
-        # First check if there's a setup function that needs to be called
-        setup_attr = SETUP_DEPENDENCIES_ATTR
-        if hasattr(instance, setup_attr):
-            setup_func = getattr(instance, setup_attr)
+        # Check instance dict directly to avoid triggering __getattr__,
+        # which would attempt dependency resolution for an internal attr name.
+        setup_func = instance.__dict__.pop(SETUP_DEPENDENCIES_ATTR, None)
+        if setup_func is not None:
             setup_func()
-            # Remove the setup function after calling it
-            delattr(instance, setup_attr)
 
+        # Resolve the base reference and forward the attribute.
+        # If the base ref isn't in the instance dict, this may trigger
+        # __getattr__ for lazy dependency resolution from the module.
         base_obj = getattr(instance, self.base_ref)
 
         return getattr(base_obj, self.target_attr_name)

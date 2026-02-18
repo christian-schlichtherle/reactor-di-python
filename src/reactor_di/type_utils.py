@@ -17,6 +17,8 @@ from typing import Any, Final, List, Tuple, Type
 
 # Constants for internal attribute names
 SETUP_DEPENDENCIES_ATTR: Final[str] = "_reactor_di_setup_dependencies"
+DEPENDENCY_MAP_ATTR: Final[str] = "_reactor_di_dependency_map"
+MODULE_INSTANCE_ATTR: Final[str] = "_reactor_di_module_instance"
 
 _PRIMITIVE_EQUIVALENT_TYPES: Final[Tuple[Type[Any], ...]] = (
     int,
