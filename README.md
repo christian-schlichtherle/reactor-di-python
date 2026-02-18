@@ -15,7 +15,8 @@ A code generator for dependency injection (DI) in Python which is based on the m
 - **Mediator pattern**: Central coordination of dependencies
 - **Factory pattern**: Object creation abstraction
 - **Type-safe**: Full type hint support
-- **Python 3.8+ support**: Requires Python 3.8+ due to `@cached_property` usage
+- **Pydantic compatible**: Works with Pydantic BaseSettings/BaseModel annotation-only fields
+- **Python 3.8+ support**: Tested on Python 3.8 through 3.14
 
 ## Installation
 
@@ -81,6 +82,23 @@ uv run pytest examples/quick_start.py
 ```
 
 All examples are automatically tested as part of the CI pipeline to ensure they stay current with the codebase.
+
+## Tests
+
+The `tests/` directory contains regression and unit tests (26 tests):
+
+- **`test_module_integration.py`** - Module + law_of_demeter integration with annotation-only configs (Pydantic compatibility)
+- **`test_pure_hasattr.py`** - Comprehensive tests for the `pure_hasattr` utility (14 tests)
+- **`test_law_of_demeter.py`** - Law of Demeter decorator tests
+- **`test_side_effects.py`** - Side effects isolation during decoration
+
+```bash
+# Run all tests (examples + regression tests)
+uv run pytest
+
+# Run only regression tests
+uv run pytest tests/
+```
 
 ## Architecture
 
@@ -199,6 +217,10 @@ Detects if a constructor assigns to an attribute using regex source analysis.
 
 Identifies primitive types (int, str, bool, etc.) that shouldn't be auto-instantiated.
 
+#### pure_hasattr(obj: Any, attr_name: str) -> bool
+
+Checks if an attribute exists without side effects like triggering descriptors or properties. Used internally to avoid premature evaluation during dependency resolution.
+
 ### Enums
 
 #### CachingStrategy
@@ -228,17 +250,20 @@ This project uses modern Python tooling and best practices:
 ### Running Tests
 
 ```bash
-# Run tests without coverage (default, fast for development)
+# Run all tests (46 tests: 20 examples + 26 regression/unit tests)
 uv run pytest
 
 # Run tests with coverage and HTML/terminal reports
 uv run pytest --cov
 
-# Run example tests
+# Run example tests only
 uv run pytest examples/                     # Run all examples as tests (20 tests)
 uv run pytest examples/caching_strategy.py  # Caching strategy examples (3 tests)
 uv run pytest examples/custom_prefix.py     # Custom prefix examples (6 tests)
 uv run pytest examples/quick_start.py       # Quick start examples (4 tests)
+
+# Run regression/unit tests only
+uv run pytest tests/                        # Run all regression tests (26 tests)
 ```
 
 ### Debugging in PyCharm

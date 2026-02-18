@@ -47,8 +47,14 @@ reactor-di-python/
 │   ├── caching.py              # CachingStrategy enum for component caching
 │   ├── type_utils.py           # Shared type checking utilities
 │   └── py.typed                # Type marker for mypy
-├── tests/                      # Test suite directory (currently empty - tests in examples/)
-│   └── __init__.py             # Package initialization
+├── tests/                      # Regression and unit tests (26 tests)
+│   ├── __init__.py             # Package initialization
+│   ├── config.py               # Test config fixture
+│   ├── database.py             # Test database fixture
+│   ├── test_law_of_demeter.py  # Law of Demeter decorator tests
+│   ├── test_module_integration.py # Module + law_of_demeter integration tests
+│   ├── test_pure_hasattr.py    # pure_hasattr utility tests (14 tests)
+│   └── test_side_effects.py    # Side effects isolation tests
 ├── examples/                   # Testable examples (20 tests, acts as test suite)
 │   ├── __init__.py             # Package initialization
 │   ├── quick_start.py          # Quick Start example as tests (4 tests)
@@ -83,7 +89,8 @@ Simplified utilities that enable type-safe DI across both decorators:
 - **`get_alternative_names()`**: Generates name variations for dependency mapping (e.g., `_config` → `config`)
 - **`has_constructor_assignment()`**: Detects attribute assignments in constructor source code
 - **`is_primitive_type()`**: Identifies primitive types that shouldn't be auto-instantiated
-- **Internal Constants**: `DEPENDENCY_MAP_ATTR`, `PARENT_INSTANCE_ATTR`, `SETUP_DEPENDENCIES_ATTR` for tracking
+- **`pure_hasattr()`**: Checks attribute existence without triggering descriptors or properties
+- **Internal Constants**: `SETUP_DEPENDENCIES_ATTR` for deferred dependency setup tracking
 
 ### Key Architectural Patterns
 - **Mediator Pattern**: `@module` acts as central coordinator for all dependencies
@@ -96,9 +103,10 @@ Simplified utilities that enable type-safe DI across both decorators:
 
 - **Coverage Achievement**: 90% test coverage requirement (focused on realistic scenarios)
 - **Framework**: pytest with pytest-cov
-- **Matrix Testing**: Python 3.8, 3.9, 3.10, 3.11, 3.12, 3.13
-- **Test Architecture**: 
-  - **Example Tests**: Real-world usage patterns as executable tests in `examples/`
+- **Matrix Testing**: Python 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
+- **Test Architecture**:
+  - **Unit/Regression Tests**: Bug regression tests and utility tests in `tests/` (26 tests)
+  - **Example Tests**: Real-world usage patterns as executable tests in `examples/` (20 tests)
   - **Streamlined Configuration**: Minimal pytest configuration for essential functionality
 - **Test Quality**: Prioritize meaningful assertions over empty coverage metrics
 - **Realistic Testing**: Remove unrealistic defensive code rather than mock impossible scenarios
@@ -155,7 +163,14 @@ Simplified utilities that enable type-safe DI across both decorators:
 
 ## Recent Updates
 
-### Code Simplification (Latest)
+### Bug Fixes: Pydantic/Annotation-Only Config Compatibility (Latest)
+- Fixed `_can_resolve_attribute` in `law_of_demeter.py` to check `get_type_hints(base_type)` for annotation-only fields (e.g., Pydantic BaseSettings/BaseModel)
+- Replaced class-level `__getattribute__` patching in `module.py` with a safe `__getattr__` fallback (`_module_getattr`), eliminating class pollution across instances
+- `__getattr__` is only called when normal attribute lookup fails, making it safe and idempotent
+- Added `pure_hasattr()` utility in `type_utils.py` to check attribute existence without triggering descriptors or properties
+- Added 26 regression tests in `tests/` covering annotation-only config forwarding, class pollution prevention, and `pure_hasattr` behavior
+
+### Code Simplification
 - Removed complex parent resolution logic from `@law_of_demeter`
 - Made `DeferredProperty` private (`_DeferredProperty`) to indicate internal use
 - Fixed bug in `get_alternative_names` using `append` instead of `extend`
