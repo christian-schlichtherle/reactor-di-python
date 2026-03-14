@@ -13,6 +13,7 @@ from .type_utils import (
     get_alternative_names,
     has_constructor_assignment,
     resolve_abstract_property_conflicts,
+    unwrap_lookup,
 )
 
 
@@ -100,7 +101,7 @@ def _can_resolve_attribute(
         True
     """
     # First, check if the base reference exists in class annotations
-    if base_type := get_type_hints(class_type).get(base_ref):
+    if base_type := unwrap_lookup(get_type_hints(class_type).get(base_ref)):
         if hasattr(base_type, target_attr_name):
             return True
 

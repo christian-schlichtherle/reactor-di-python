@@ -8,8 +8,11 @@ Key features:
 - Alternative name generation for dependency mapping
 - Primitive type detection to avoid instantiation
 - Constructor source analysis for attribute assignment detection
+- ``lookup`` annotation marker for parent-module dependency resolution
 - Internal attribute constants for dependency tracking
 """
+
+from __future__ import annotations
 
 import inspect
 import re
@@ -20,6 +23,67 @@ SETUP_DEPENDENCIES_ATTR: Final[str] = "_reactor_di_setup_dependencies"
 DEPENDENCY_MAP_ATTR: Final[str] = "_reactor_di_dependency_map"
 MODULE_INSTANCE_ATTR: Final[str] = "_reactor_di_module_instance"
 REACTOR_DI_LOCK_ATTR: Final[str] = "_reactor_di_lock"
+
+
+class _LookupMarker:
+    """Internal wrapper returned by ``lookup[Type]``.
+
+    Stores the inner type so that decorators can detect and unwrap it.
+    """
+
+    __slots__ = ("inner_type",)
+
+    def __init__(self, inner_type: type[Any]) -> None:
+        self.inner_type = inner_type
+
+    def __repr__(self) -> str:
+        name = getattr(self.inner_type, "__name__", repr(self.inner_type))
+        return f"lookup[{name}]"
+
+
+class lookup:
+    """Annotation marker for dependencies resolved from a parent module.
+
+    Usage::
+
+        @module(CachingStrategy.NOT_THREAD_SAFE)
+        class ChildModule:
+            db: lookup[DatabaseConnection]   # resolved from parent module
+            service: MyService               # created locally as usual
+
+    On a **module**, ``@module`` skips factory generation and installs a
+    lightweight property so the name is visible to child-component factories.
+    The actual value is injected lazily by the parent module.
+
+    On a **component**, ``lookup`` is a no-op — the type is unwrapped and
+    dependency resolution proceeds as normal.
+
+    All other use is an error.
+    """
+
+    def __class_getitem__(cls, params: Any) -> _LookupMarker:
+        return _LookupMarker(params)
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        raise TypeError("lookup cannot be subclassed")
+
+    def __init__(self) -> None:
+        raise TypeError(
+            "lookup is not instantiable — use as a type annotation: lookup[Type]"
+        )
+
+
+def is_lookup_type(annotation: Any) -> bool:
+    """Return True if *annotation* is a ``lookup[X]`` marker."""
+    return isinstance(annotation, _LookupMarker)
+
+
+def unwrap_lookup(annotation: Any) -> Any:
+    """Unwrap ``lookup[X]`` to ``X``.  Returns *annotation* unchanged otherwise."""
+    if isinstance(annotation, _LookupMarker):
+        return annotation.inner_type
+    return annotation
+
 
 _PRIMITIVE_EQUIVALENT_TYPES: Final[tuple[type[Any], ...]] = (
     int,

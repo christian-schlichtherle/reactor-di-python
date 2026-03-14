@@ -10,11 +10,12 @@ A code generator for dependency injection (DI) in Python which is based on the m
 
 ## Features
 
-- **Two powerful decorators**: `@module` and `@law_of_demeter`
+- **Two powerful decorators**: `@module` and `@law_of_demeter`, plus the `lookup` annotation marker
 - **Code generation approach**: Generates DI code rather than runtime injection
 - **Mediator pattern**: Central coordination of dependencies
 - **Factory pattern**: Object creation abstraction
 - **Type-safe**: Full type hint support
+- **Nested modules**: Child modules use `lookup[Type]` to share dependencies from parent modules
 - **Lazy dependency resolution**: Dependencies resolved individually on first access, supporting deferred initialization patterns (e.g., async context managers)
 - **TYPE_CHECKING compatible**: Works with `if TYPE_CHECKING:` imports for circular dependency avoidance
 - **Pydantic compatible**: Works with Pydantic BaseSettings/BaseModel annotation-only fields
@@ -70,6 +71,7 @@ The `examples/` directory contains testable examples that demonstrate all the fe
 - **`quick_start.py`** - The complete Quick Start example above, converted to testable format
 - **`quick_start_advanced.py`** - Advanced quick start with inheritance patterns
 - **`caching_strategy.py`** - Demonstrates `CachingStrategy.DISABLED`, `CachingStrategy.NOT_THREAD_SAFE`, and `CachingStrategy.THREAD_SAFE`
+- **`nested_modules.py`** - Nested modules with `lookup` for parent dependency sharing
 - **`stacked_decorators.py`** - Shows using multiple `@law_of_demeter` decorators on the same class
 - **`custom_prefix.py`** - Demonstrates custom prefix options (`prefix=''`, `prefix='cfg_'`, etc.)
 - **`side_effects.py`** - Tests side effect isolation during decoration
@@ -114,7 +116,7 @@ Reactor DI uses a **code generation approach** with clean separation of concerns
 - **`module.py`** - The `@module` decorator for dependency injection containers
 - **`law_of_demeter.py`** - The `@law_of_demeter` decorator for property forwarding
 - **`caching.py`** - Caching strategies (`CachingStrategy.DISABLED`, `CachingStrategy.NOT_THREAD_SAFE`, `CachingStrategy.THREAD_SAFE`)
-- **`type_utils.py`** - Simplified type checking utilities (Python 3.9+ stable APIs)
+- **`type_utils.py`** - Simplified type checking utilities and the `lookup` annotation marker (Python 3.9+ stable APIs)
 
 The decorators work together through simple `hasattr` checks - `@law_of_demeter` creates forwarding properties that `@module` recognizes as already implemented, enabling clean cooperation without complex validation logic.
 
@@ -159,6 +161,29 @@ class ResourceController:
     _api: object
     _namespace: str
 ```
+
+### Nested Modules
+
+Child modules can share dependencies from their parent using `lookup[Type]`:
+
+```python
+from reactor_di import module, lookup, CachingStrategy
+
+@module(CachingStrategy.NOT_THREAD_SAFE)
+class CacheModule:
+    db: lookup[DatabaseConnection]   # resolved from parent module
+    cache_config: CacheConfig        # created locally
+
+@module(CachingStrategy.NOT_THREAD_SAFE)
+class AppModule:
+    db: DatabaseConnection           # created here
+    cache_module: CacheModule        # child module — db injected from here
+
+app = AppModule()
+assert app.cache_module.db is app.db  # same instance
+```
+
+On a component (non-module class), `lookup` is a no-op — the type is unwrapped and dependency resolution proceeds normally.
 
 ### Custom Prefixes
 
@@ -212,6 +237,20 @@ Creates property forwarding from a base reference to avoid Law of Demeter violat
 class Service:
     _timeout: int     # Forwards to _config.timeout
     _host: str        # Forwards to _config.host
+```
+
+### Annotation Markers
+
+#### lookup[Type]
+
+Marks a module annotation as a dependency that should be resolved from the parent module rather than being created locally. On a module, `@module` skips factory generation and installs a lightweight property; the actual value is injected lazily by the parent. On a component, `lookup` is a no-op.
+
+**Usage:**
+```python
+@module(CachingStrategy.NOT_THREAD_SAFE)
+class ChildModule:
+    shared_db: lookup[DatabaseConnection]  # resolved from parent
+    local_service: MyService               # created locally
 ```
 
 ### Type Utilities
@@ -268,14 +307,14 @@ This project uses modern Python tooling and best practices:
 ### Running Tests
 
 ```bash
-# Run all tests (71 tests: 22 examples + 49 regression/unit tests)
+# Run all tests (76 tests: 27 examples + 49 regression/unit tests)
 uv run pytest
 
 # Run tests with coverage and HTML/terminal reports
 uv run pytest --cov
 
 # Run example tests only
-uv run pytest examples/                     # Run all examples as tests (22 tests)
+uv run pytest examples/                     # Run all examples as tests (27 tests)
 uv run pytest examples/caching_strategy.py  # Caching strategy examples (5 tests)
 uv run pytest examples/custom_prefix.py     # Custom prefix examples (6 tests)
 uv run pytest examples/quick_start.py       # Quick start examples (4 tests)

@@ -16,6 +16,8 @@ from .type_utils import (
     DEPENDENCY_MAP_ATTR,
     MODULE_INSTANCE_ATTR,
     REACTOR_DI_LOCK_ATTR,
+    _install_dict_backed_property,
+    is_lookup_type,
     is_primitive_type,
     pure_hasattr,
     resolve_abstract_property_conflicts,
@@ -186,6 +188,14 @@ def _apply_module_decorator(
     # Process each type-annotated attribute
     for attr_name, attr_type in get_type_hints(class_type).items():
         if hasattr(class_type, attr_name):
+            continue
+
+        # lookup[X] — skip factory generation; install a dict-backed property
+        # so the name is visible to pure_hasattr when child-component
+        # factories build their dependency maps.  The actual value is
+        # injected lazily by the parent module's dependency-map mechanism.
+        if is_lookup_type(attr_type):
+            _install_dict_backed_property(class_type, attr_name)
             continue
 
         if isinstance(attr_type, str):
