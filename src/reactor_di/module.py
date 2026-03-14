@@ -11,7 +11,7 @@ import threading
 from functools import cached_property
 from typing import Any, Callable, Type, Union, get_type_hints
 
-from .caching import CachingStrategy
+from .caching import CachingStrategy, thread_safe_cached_property
 from .type_utils import (
     DEPENDENCY_MAP_ATTR,
     MODULE_INSTANCE_ATTR,
@@ -19,43 +19,6 @@ from .type_utils import (
     is_primitive_type,
     pure_hasattr,
 )
-
-
-class _ThreadSafeCachedProperty:
-    """A cached property descriptor with per-instance, per-attribute locking.
-
-    Uses double-checked locking to ensure the factory runs exactly once per
-    instance, even under concurrent access from multiple threads.
-    """
-
-    def __init__(self, func: Callable[..., Any]) -> None:
-        self.func = func
-        self.attr_name: str = ""
-        self.lock_name: str = ""
-
-    def __set_name__(self, owner: Type[Any], name: str) -> None:
-        self.attr_name = name
-        self.lock_name = f"_lock_{name}"
-
-    def __get__(self, instance: Any, owner: Type[Any] | None = None) -> Any:
-        if instance is None:
-            return self
-        # Fast path: already cached in instance dict
-        try:
-            return instance.__dict__[self.attr_name]
-        except KeyError:
-            pass
-        # Slow path: acquire per-instance, per-attribute lock
-        lock = instance.__dict__.setdefault(self.lock_name, threading.Lock())
-        with lock:
-            # Double-check after acquiring lock
-            try:
-                return instance.__dict__[self.attr_name]
-            except KeyError:
-                pass
-            value = self.func(instance)
-            instance.__dict__[self.attr_name] = value
-            return value
 
 
 def _module_getattr(self: Any, name: str) -> Any:
@@ -109,7 +72,7 @@ def _resolve_dep_locked(
 
 def _create_factory_method(
     attr_type: Type[Any], caching_strategy: CachingStrategy
-) -> Union[property, cached_property[Any], _ThreadSafeCachedProperty]:
+) -> Union[property, cached_property[Any], thread_safe_cached_property]:
     """Create a factory method for a dependency.
 
     Generates a property that lazily instantiates dependencies. The factory
@@ -190,7 +153,7 @@ def _create_factory_method(
     if caching_strategy == CachingStrategy.NOT_THREAD_SAFE:
         return cached_property(factory)
     if caching_strategy == CachingStrategy.THREAD_SAFE:
-        return _ThreadSafeCachedProperty(factory)
+        return thread_safe_cached_property(factory)
     if caching_strategy == CachingStrategy.DISABLED:
         return property(factory)
     raise ValueError(f"Unsupported caching strategy: {caching_strategy}")

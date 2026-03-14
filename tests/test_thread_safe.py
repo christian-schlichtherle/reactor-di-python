@@ -10,7 +10,12 @@ from __future__ import annotations
 import threading
 from functools import cached_property
 
-from reactor_di import CachingStrategy, law_of_demeter, module
+from reactor_di import (
+    CachingStrategy,
+    law_of_demeter,
+    module,
+    thread_safe_cached_property,
+)
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -190,3 +195,77 @@ def test_thread_safe_with_law_of_demeter_forwarding():
     assert controller._host == "localhost"
     assert controller._port == 8080
     assert controller._config is mod.config
+
+
+# ---------------------------------------------------------------------------
+# Standalone thread_safe_cached_property tests
+# ---------------------------------------------------------------------------
+
+
+class StandaloneWidget:
+    """A plain class using thread_safe_cached_property directly."""
+
+    call_count: int = 0
+
+    @thread_safe_cached_property
+    def expensive(self) -> list:
+        StandaloneWidget.call_count += 1
+        return [42]
+
+
+def test_standalone_caches_value():
+    """Standalone descriptor caches and returns the same instance."""
+    w = StandaloneWidget()
+    StandaloneWidget.call_count = 0
+
+    first = w.expensive
+    second = w.expensive
+
+    assert first is second
+    assert first == [42]
+    assert StandaloneWidget.call_count == 1
+
+
+def test_standalone_independent_instances():
+    """Each instance gets its own cached value."""
+    w1 = StandaloneWidget()
+    w2 = StandaloneWidget()
+
+    assert w1.expensive is not w2.expensive
+    assert w1.expensive is w1.expensive
+
+
+def test_standalone_concurrent_access():
+    """N threads racing on a standalone descriptor get the same instance."""
+    StandaloneWidget.call_count = 0
+    w = StandaloneWidget()
+    num_threads = 20
+    results: list = []
+    barrier = threading.Barrier(num_threads)
+
+    def access() -> None:
+        barrier.wait()
+        results.append(w.expensive)
+
+    threads = [threading.Thread(target=access) for _ in range(num_threads)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    assert len(results) == num_threads
+    assert all(r is results[0] for r in results)
+    assert StandaloneWidget.call_count == 1
+
+
+def test_standalone_class_access_returns_descriptor():
+    """Accessing on the class returns the descriptor itself."""
+    descriptor = StandaloneWidget.__dict__["expensive"]
+    assert isinstance(descriptor, thread_safe_cached_property)
+    assert StandaloneWidget.expensive is descriptor
+
+
+def test_class_getitem():
+    """thread_safe_cached_property supports subscript for type annotations."""
+    alias = thread_safe_cached_property[int]
+    assert alias is thread_safe_cached_property
