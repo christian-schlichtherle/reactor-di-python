@@ -87,11 +87,12 @@ All examples are automatically tested as part of the CI pipeline to ensure they 
 
 ## Tests
 
-The `tests/` directory contains regression and unit tests (43 tests):
+The `tests/` directory contains regression and unit tests (46 tests):
 
 - **`test_module_integration.py`** - Module + law_of_demeter integration with annotation-only configs (Pydantic compatibility)
 - **`test_lazy_resolution.py`** - Lazy per-attribute resolution with deferred initialization patterns
 - **`test_forward_ref.py`** - TYPE_CHECKING forward reference handling in module factory
+- **`test_dataclass_law_of_demeter.py`** - Dataclass + stacked @law_of_demeter regression tests (3 tests)
 - **`test_pure_hasattr.py`** - Comprehensive tests for the `pure_hasattr` utility (14 tests)
 - **`test_thread_safe.py`** - Thread-safe caching strategy with concurrent access tests (12 tests)
 - **`test_law_of_demeter.py`** - Law of Demeter decorator tests
@@ -262,7 +263,7 @@ This project uses modern Python tooling and best practices:
 ### Running Tests
 
 ```bash
-# Run all tests (65 tests: 22 examples + 43 regression/unit tests)
+# Run all tests (68 tests: 22 examples + 46 regression/unit tests)
 uv run pytest
 
 # Run tests with coverage and HTML/terminal reports
@@ -275,7 +276,7 @@ uv run pytest examples/custom_prefix.py     # Custom prefix examples (6 tests)
 uv run pytest examples/quick_start.py       # Quick start examples (4 tests)
 
 # Run regression/unit tests only
-uv run pytest tests/                        # Run all regression tests (43 tests)
+uv run pytest tests/                        # Run all regression tests (46 tests)
 ```
 
 ### Debugging in PyCharm

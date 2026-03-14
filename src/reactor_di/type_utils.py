@@ -98,7 +98,12 @@ def has_constructor_assignment(class_type: type[Any], attr_name: str) -> bool:
     init = class_type.__init__
     self = next(iter(inspect.signature(init).parameters))
 
-    source = inspect.getsource(init)
+    try:
+        source = inspect.getsource(init)
+    except OSError:
+        # Source unavailable (e.g. dataclass-generated __init__) — can't prove
+        # the assignment exists, so conservatively return False.
+        return False
     # Use combined regex pattern to match both assignment and type annotation
     # Matches: self.attr = value OR self.attr: Type = value
     return bool(
