@@ -6,8 +6,8 @@ requires = ["hatchling", "hatch-vcs"]
 dev = [
     "black>=24.0.0",
     "mypy>=1.14.0",
-    "pytest-cov>=4.0.0",
     "pytest>=8.0.0",
+    "pytest-cov>=4.0.0",
     "ruff>=0.12.4",
 ]
 
@@ -33,7 +33,7 @@ classifiers = [
 dependencies = []
 description = "A code generator for dependency injection (DI) in Python which is based on the mediator and factory patterns"
 dynamic = ["version"]
-keywords = ["dependency-injection", "di", "code-generation", "mediator", "factory"]
+keywords = ["code-generation", "dependency-injection", "di", "factory", "mediator"]
 license = { text = "MIT" }
 name = "reactor-di"
 readme = "README.md"
@@ -107,7 +107,7 @@ warn_unused_ignores = true
 
 [[tool.mypy.overrides]]
 disallow_untyped_defs = false
-module = ["tests.*", "examples.*"]
+module = ["examples.*", "tests.*"]
 
 [tool.pytest.ini_options]
 addopts = [
@@ -120,7 +120,7 @@ markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
 ]
 python_classes = ["Test*"]
-python_files = ["test_*.py", "examples/*.py"]
+python_files = ["examples/*.py", "test_*.py"]
 python_functions = ["test_*"]
 testpaths = ["examples", "tests"]
 
@@ -129,6 +129,16 @@ line-length = 88
 target-version = "py38"
 
 [tool.ruff.lint]
+ignore = [
+    "B008", # do not perform function calls in argument defaults
+    "C901", # too complex
+    "E501", # line too long, handled by black
+    "FBT002", # boolean default positional argument
+    "FBT003", # boolean positional value in function call
+    "T201", # print statements (can be useful for debugging)
+    "UP006", # use type instead of Type (need Type for Python 3.8)
+    "UP007", # use X | Y instead of Union (need Union for Python 3.8)
+]
 select = [
     "ARG001", # unused-function-args
     "B", # flake8-bugbear
@@ -147,25 +157,15 @@ select = [
     "UP", # pyupgrade
     "W", # pycodestyle warnings
 ]
-ignore = [
-    "B008", # do not perform function calls in argument defaults
-    "C901", # too complex
-    "E501", # line too long, handled by black
-    "FBT002", # boolean default positional argument
-    "FBT003", # boolean positional value in function call
-    "T201", # print statements (can be useful for debugging)
-    "UP006", # use type instead of Type (need Type for Python 3.8)
-    "UP007", # use X | Y instead of Union (need Union for Python 3.8)
-]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = [
+"examples/*" = [
     "ARG",
     "FBT",
     "SIM",
     "T20",
 ]
-"examples/*" = [
+"tests/*" = [
     "ARG",
     "FBT",
     "SIM",
