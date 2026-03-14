@@ -16,9 +16,8 @@ This is useful for:
 - Combining with ``@law_of_demeter`` where the base_ref type is abstract
 """
 
-from __future__ import annotations
-
 from abc import ABC, abstractmethod
+from typing import Optional
 
 from reactor_di import CachingStrategy, law_of_demeter, make, module
 
@@ -44,14 +43,14 @@ class FileLogger(Logger):
 
 class Cache(ABC):
     @abstractmethod
-    def get(self, key: str) -> str | None: ...
+    def get(self, key: str) -> Optional[str]: ...
 
 
 class InMemoryCache(Cache):
     def __init__(self) -> None:
         self._store: dict[str, str] = {}
 
-    def get(self, key: str) -> str | None:
+    def get(self, key: str) -> Optional[str]:
         return self._store.get(key)
 
 
