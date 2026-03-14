@@ -7,6 +7,7 @@ raising errors for attributes that cannot be satisfied.
 
 from __future__ import annotations
 
+import threading
 from functools import cached_property
 from typing import Any, Callable, Type, Union, get_type_hints
 
@@ -14,9 +15,47 @@ from .caching import CachingStrategy
 from .type_utils import (
     DEPENDENCY_MAP_ATTR,
     MODULE_INSTANCE_ATTR,
+    REACTOR_DI_LOCK_ATTR,
     is_primitive_type,
     pure_hasattr,
 )
+
+
+class _ThreadSafeCachedProperty:
+    """A cached property descriptor with per-instance, per-attribute locking.
+
+    Uses double-checked locking to ensure the factory runs exactly once per
+    instance, even under concurrent access from multiple threads.
+    """
+
+    def __init__(self, func: Callable[..., Any]) -> None:
+        self.func = func
+        self.attr_name: str = ""
+        self.lock_name: str = ""
+
+    def __set_name__(self, owner: Type[Any], name: str) -> None:
+        self.attr_name = name
+        self.lock_name = f"_lock_{name}"
+
+    def __get__(self, instance: Any, owner: Type[Any] | None = None) -> Any:
+        if instance is None:
+            return self
+        # Fast path: already cached in instance dict
+        try:
+            return instance.__dict__[self.attr_name]
+        except KeyError:
+            pass
+        # Slow path: acquire per-instance, per-attribute lock
+        lock = instance.__dict__.setdefault(self.lock_name, threading.Lock())
+        with lock:
+            # Double-check after acquiring lock
+            try:
+                return instance.__dict__[self.attr_name]
+            except KeyError:
+                pass
+            value = self.func(instance)
+            instance.__dict__[self.attr_name] = value
+            return value
 
 
 def _module_getattr(self: Any, name: str) -> Any:
@@ -30,25 +69,47 @@ def _module_getattr(self: Any, name: str) -> Any:
     """
     dep_map = self.__dict__.get(DEPENDENCY_MAP_ATTR)
     if dep_map is not None and name in dep_map:
-        module_ref = self.__dict__[MODULE_INSTANCE_ATTR]
-        parent_attr = dep_map[name]
-        dep_value = getattr(module_ref, parent_attr)
-        # Only remove from map after successful resolution
-        setattr(self, name, dep_value)
-        del dep_map[name]
-        if not dep_map:
-            del self.__dict__[DEPENDENCY_MAP_ATTR]
-            del self.__dict__[MODULE_INSTANCE_ATTR]
-        return dep_value
+        lock = self.__dict__.get(REACTOR_DI_LOCK_ATTR)
+        if lock is not None:
+            return _resolve_dep_locked(self, name, dep_map, lock)
+        return _resolve_dep(self, name, dep_map)
     raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
 
 
 _module_getattr._reactor_di = True  # type: ignore[attr-defined]
 
 
+def _resolve_dep(self: Any, name: str, dep_map: dict[str, str]) -> Any:
+    """Resolve a single dependency from the module instance (no locking)."""
+    module_ref = self.__dict__[MODULE_INSTANCE_ATTR]
+    parent_attr = dep_map[name]
+    dep_value = getattr(module_ref, parent_attr)
+    setattr(self, name, dep_value)
+    del dep_map[name]
+    if not dep_map:
+        del self.__dict__[DEPENDENCY_MAP_ATTR]
+        del self.__dict__[MODULE_INSTANCE_ATTR]
+    return dep_value
+
+
+def _resolve_dep_locked(
+    self: Any, name: str, dep_map: dict[str, str], lock: threading.Lock
+) -> Any:
+    """Resolve a single dependency under a lock for thread safety."""
+    with lock:
+        # Double-check: another thread may have resolved it already
+        if name in self.__dict__:
+            return self.__dict__[name]
+        if name not in dep_map:
+            raise AttributeError(
+                f"'{type(self).__name__}' object has no attribute '{name}'"
+            )
+        return _resolve_dep(self, name, dep_map)
+
+
 def _create_factory_method(
     attr_type: Type[Any], caching_strategy: CachingStrategy
-) -> Union[property, cached_property[Any]]:
+) -> Union[property, cached_property[Any], _ThreadSafeCachedProperty]:
     """Create a factory method for a dependency.
 
     Generates a property that lazily instantiates dependencies. The factory
@@ -106,6 +167,11 @@ def _create_factory_method(
             instance.__dict__[DEPENDENCY_MAP_ATTR] = dict(dependency_map)
             instance.__dict__[MODULE_INSTANCE_ATTR] = module_instance
 
+            # For THREAD_SAFE modules, store a lock on the instance so
+            # _module_getattr can synchronize lazy dependency resolution.
+            if caching_strategy == CachingStrategy.THREAD_SAFE:
+                instance.__dict__[REACTOR_DI_LOCK_ATTR] = threading.Lock()
+
             # Install __getattr__ on the class so that non-descriptor
             # dependencies (those not handled by _DeferredProperty) trigger
             # lazy resolution on first access.  Unlike __getattribute__,
@@ -123,6 +189,8 @@ def _create_factory_method(
     # Apply caching strategy
     if caching_strategy == CachingStrategy.NOT_THREAD_SAFE:
         return cached_property(factory)
+    if caching_strategy == CachingStrategy.THREAD_SAFE:
+        return _ThreadSafeCachedProperty(factory)
     if caching_strategy == CachingStrategy.DISABLED:
         return property(factory)
     raise ValueError(f"Unsupported caching strategy: {caching_strategy}")

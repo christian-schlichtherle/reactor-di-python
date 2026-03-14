@@ -47,7 +47,7 @@ reactor-di-python/
 │   ├── caching.py              # CachingStrategy enum for component caching
 │   ├── type_utils.py           # Shared type checking utilities
 │   └── py.typed                # Type marker for mypy
-├── tests/                      # Regression and unit tests (31 tests)
+├── tests/                      # Regression and unit tests (38 tests)
 │   ├── __init__.py             # Package initialization
 │   ├── config.py               # Test config fixture
 │   ├── database.py             # Test database fixture
@@ -56,12 +56,13 @@ reactor-di-python/
 │   ├── test_lazy_resolution.py # Lazy per-attribute resolution with deferred init
 │   ├── test_module_integration.py # Module + law_of_demeter integration tests
 │   ├── test_pure_hasattr.py    # pure_hasattr utility tests (14 tests)
-│   └── test_side_effects.py    # Side effects isolation tests
-├── examples/                   # Testable examples (20 tests, acts as test suite)
+│   ├── test_side_effects.py    # Side effects isolation tests
+│   └── test_thread_safe.py     # Thread-safe caching strategy tests (7 tests)
+├── examples/                   # Testable examples (22 tests, acts as test suite)
 │   ├── __init__.py             # Package initialization
 │   ├── quick_start.py          # Quick Start example as tests (4 tests)
 │   ├── quick_start_advanced.py # Advanced quick start example (4 tests)
-│   ├── caching_strategy.py     # Caching strategy examples (3 tests)
+│   ├── caching_strategy.py     # Caching strategy examples (5 tests)
 │   ├── custom_prefix.py        # Custom prefix examples (6 tests)
 │   ├── side_effects.py         # Side effects testing (1 test)
 │   └── stacked_decorators.py   # Stacked decorators example (2 tests)
@@ -92,11 +93,11 @@ Simplified utilities that enable type-safe DI across both decorators:
 - **`has_constructor_assignment()`**: Detects attribute assignments in constructor source code
 - **`is_primitive_type()`**: Identifies primitive types that shouldn't be auto-instantiated
 - **`pure_hasattr()`**: Checks attribute existence without triggering descriptors or properties
-- **Internal Constants**: `DEPENDENCY_MAP_ATTR`, `MODULE_INSTANCE_ATTR` for lazy dependency resolution; `SETUP_DEPENDENCIES_ATTR` for backward-compatible deferred setup
+- **Internal Constants**: `DEPENDENCY_MAP_ATTR`, `MODULE_INSTANCE_ATTR` for lazy dependency resolution; `REACTOR_DI_LOCK_ATTR` for thread-safe locking; `SETUP_DEPENDENCIES_ATTR` for backward-compatible deferred setup
 
 ### Key Architectural Patterns
 - **Mediator Pattern**: `@module` acts as central coordinator for all dependencies
-- **Factory Pattern**: Generates `@cached_property` or `property` methods for object creation
+- **Factory Pattern**: Generates `@cached_property`, `property`, or `_ThreadSafeCachedProperty` methods for object creation
 - **Lazy Per-Attribute Resolution**: Dependencies from `@module` are resolved individually on first access via `__getattr__`, not eagerly all at once
 - **Deferred Resolution**: `_DeferredProperty` class handles runtime attribute forwarding for `@law_of_demeter`
 - **Pluggable Caching**: `CachingStrategy` enum applied at decoration time
@@ -109,8 +110,8 @@ Simplified utilities that enable type-safe DI across both decorators:
 - **Framework**: pytest with pytest-cov
 - **Matrix Testing**: Python 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
 - **Test Architecture**:
-  - **Unit/Regression Tests**: Bug regression tests and utility tests in `tests/` (31 tests)
-  - **Example Tests**: Real-world usage patterns as executable tests in `examples/` (20 tests)
+  - **Unit/Regression Tests**: Bug regression tests and utility tests in `tests/` (38 tests)
+  - **Example Tests**: Real-world usage patterns as executable tests in `examples/` (22 tests)
   - **Streamlined Configuration**: Minimal pytest configuration for essential functionality
 - **Test Quality**: Prioritize meaningful assertions over empty coverage metrics
 - **Realistic Testing**: Remove unrealistic defensive code rather than mock impossible scenarios
@@ -167,7 +168,17 @@ Simplified utilities that enable type-safe DI across both decorators:
 
 ## Recent Updates
 
-### Bug Fix: TYPE_CHECKING Forward Reference Handling (Latest)
+### Feature: Thread-Safe Caching Strategy (Latest)
+- Added `CachingStrategy.THREAD_SAFE` for singleton components with thread-safe guarantees
+- `_ThreadSafeCachedProperty` descriptor uses double-checked locking with per-instance, per-attribute locks
+- Fast path (already cached) is a single `__dict__` lookup with no locking overhead
+- Thread-safe `_module_getattr`: lazy dependency resolution acquires a per-instance lock (`REACTOR_DI_LOCK_ATTR`) when resolving dependencies for `THREAD_SAFE` modules
+- Only `THREAD_SAFE` modules pay the locking cost — `NOT_THREAD_SAFE` and `DISABLED` are unchanged
+- Added `REACTOR_DI_LOCK_ATTR` constant in `type_utils.py` for the per-instance lock attribute name
+- Added 7 regression tests in `tests/test_thread_safe.py` covering concurrent access, `_module_getattr` thread safety, mixed strategies, and `@law_of_demeter` integration
+- Added 2 example tests in `examples/caching_strategy.py` demonstrating thread-safe caching and concurrent access
+
+### Bug Fix: TYPE_CHECKING Forward Reference Handling
 - Fixed `NameError` when component classes use `if TYPE_CHECKING:` imports to avoid circular dependencies
 - The module factory's `get_type_hints()` call now falls back to raw `__annotations__` from the MRO when forward references can't be resolved at runtime
 - This is safe because the factory only needs annotation *names* (not resolved types) for dependency mapping

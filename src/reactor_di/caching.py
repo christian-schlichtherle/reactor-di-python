@@ -18,3 +18,6 @@ class CachingStrategy(Enum):
 
     NOT_THREAD_SAFE = "not_thread_safe"
     """Cache components using @cached_property (not thread-safe but performant)."""
+
+    THREAD_SAFE = "thread_safe"
+    """Cache components using a thread-safe descriptor with per-instance locking."""

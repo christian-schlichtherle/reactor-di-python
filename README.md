@@ -68,7 +68,7 @@ The `examples/` directory contains testable examples that demonstrate all the fe
 
 - **`quick_start.py`** - The complete Quick Start example above, converted to testable format
 - **`quick_start_advanced.py`** - Advanced quick start with inheritance patterns
-- **`caching_strategy.py`** - Demonstrates `CachingStrategy.DISABLED` vs `CachingStrategy.NOT_THREAD_SAFE`
+- **`caching_strategy.py`** - Demonstrates `CachingStrategy.DISABLED`, `CachingStrategy.NOT_THREAD_SAFE`, and `CachingStrategy.THREAD_SAFE`
 - **`stacked_decorators.py`** - Shows using multiple `@law_of_demeter` decorators on the same class
 - **`custom_prefix.py`** - Demonstrates custom prefix options (`prefix=''`, `prefix='cfg_'`, etc.)
 - **`side_effects.py`** - Tests side effect isolation during decoration
@@ -87,12 +87,13 @@ All examples are automatically tested as part of the CI pipeline to ensure they 
 
 ## Tests
 
-The `tests/` directory contains regression and unit tests (31 tests):
+The `tests/` directory contains regression and unit tests (38 tests):
 
 - **`test_module_integration.py`** - Module + law_of_demeter integration with annotation-only configs (Pydantic compatibility)
 - **`test_lazy_resolution.py`** - Lazy per-attribute resolution with deferred initialization patterns
 - **`test_forward_ref.py`** - TYPE_CHECKING forward reference handling in module factory
 - **`test_pure_hasattr.py`** - Comprehensive tests for the `pure_hasattr` utility (14 tests)
+- **`test_thread_safe.py`** - Thread-safe caching strategy with concurrent access tests (7 tests)
 - **`test_law_of_demeter.py`** - Law of Demeter decorator tests
 - **`test_side_effects.py`** - Side effects isolation during decoration
 
@@ -110,7 +111,7 @@ Reactor DI uses a **code generation approach** with clean separation of concerns
 
 - **`module.py`** - The `@module` decorator for dependency injection containers
 - **`law_of_demeter.py`** - The `@law_of_demeter` decorator for property forwarding
-- **`caching.py`** - Caching strategies (`CachingStrategy.DISABLED`, `CachingStrategy.NOT_THREAD_SAFE`)
+- **`caching.py`** - Caching strategies (`CachingStrategy.DISABLED`, `CachingStrategy.NOT_THREAD_SAFE`, `CachingStrategy.THREAD_SAFE`)
 - **`type_utils.py`** - Simplified type checking utilities (Python 3.8+ stable APIs)
 
 The decorators work together through simple `hasattr` checks - `@law_of_demeter` creates forwarding properties that `@module` recognizes as already implemented, enabling clean cooperation without complex validation logic.
@@ -130,6 +131,11 @@ class DevModule:
 # Cached components - same instance returned (not thread-safe)
 @module(CachingStrategy.NOT_THREAD_SAFE)
 class ProdModule:
+    service: MyService
+
+# Cached components - same instance returned (thread-safe, uses locking)
+@module(CachingStrategy.THREAD_SAFE)
+class ThreadSafeProdModule:
     service: MyService
 ```
 
@@ -180,6 +186,7 @@ Creates a dependency injection module that automatically instantiates and provid
 - `strategy`: Caching strategy for component instances
   - `CachingStrategy.DISABLED`: Create new instances each time (default)
   - `CachingStrategy.NOT_THREAD_SAFE`: Cache instances (not thread-safe)
+  - `CachingStrategy.THREAD_SAFE`: Cache instances with per-instance locking (thread-safe)
 
 **Usage:**
 ```python
@@ -233,6 +240,7 @@ Component caching strategies for the `@module` decorator.
 
 - `DISABLED = "disabled"`: No caching, create new instances each time
 - `NOT_THREAD_SAFE = "not_thread_safe"`: Cache instances (not thread-safe)
+- `THREAD_SAFE = "thread_safe"`: Cache instances with per-instance locking (thread-safe)
 
 ## Development
 
@@ -254,20 +262,20 @@ This project uses modern Python tooling and best practices:
 ### Running Tests
 
 ```bash
-# Run all tests (51 tests: 20 examples + 31 regression/unit tests)
+# Run all tests (60 tests: 22 examples + 38 regression/unit tests)
 uv run pytest
 
 # Run tests with coverage and HTML/terminal reports
 uv run pytest --cov
 
 # Run example tests only
-uv run pytest examples/                     # Run all examples as tests (20 tests)
-uv run pytest examples/caching_strategy.py  # Caching strategy examples (3 tests)
+uv run pytest examples/                     # Run all examples as tests (22 tests)
+uv run pytest examples/caching_strategy.py  # Caching strategy examples (5 tests)
 uv run pytest examples/custom_prefix.py     # Custom prefix examples (6 tests)
 uv run pytest examples/quick_start.py       # Quick start examples (4 tests)
 
 # Run regression/unit tests only
-uv run pytest tests/                        # Run all regression tests (31 tests)
+uv run pytest tests/                        # Run all regression tests (38 tests)
 ```
 
 ### Debugging in PyCharm
