@@ -16,6 +16,8 @@ This is useful for:
 - Combining with ``@law_of_demeter`` where the base_ref type is abstract
 """
 
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 
 from reactor_di import CachingStrategy, law_of_demeter, make, module
