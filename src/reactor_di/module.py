@@ -72,7 +72,7 @@ def _resolve_dep_locked(
 
 def _create_factory_method(
     attr_type: type[Any], caching_strategy: CachingStrategy
-) -> property | cached_property[Any] | thread_safe_cached_property:
+) -> property | cached_property[Any] | thread_safe_cached_property[Any]:
     """Create a factory method for a dependency.
 
     Generates a property that lazily instantiates dependencies. The factory

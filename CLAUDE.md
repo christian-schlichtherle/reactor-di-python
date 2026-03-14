@@ -47,7 +47,7 @@ reactor-di-python/
 │   ├── caching.py              # CachingStrategy enum and thread_safe_cached_property descriptor
 │   ├── type_utils.py           # Shared type checking utilities
 │   └── py.typed                # Type marker for mypy
-├── tests/                      # Regression and unit tests (38 tests)
+├── tests/                      # Regression and unit tests (43 tests)
 │   ├── __init__.py             # Package initialization
 │   ├── config.py               # Test config fixture
 │   ├── database.py             # Test database fixture
@@ -110,7 +110,7 @@ Simplified utilities that enable type-safe DI across both decorators:
 - **Framework**: pytest with pytest-cov
 - **Matrix Testing**: Python 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
 - **Test Architecture**:
-  - **Unit/Regression Tests**: Bug regression tests and utility tests in `tests/` (38 tests)
+  - **Unit/Regression Tests**: Bug regression tests and utility tests in `tests/` (43 tests)
   - **Example Tests**: Real-world usage patterns as executable tests in `examples/` (22 tests)
   - **Streamlined Configuration**: Minimal pytest configuration for essential functionality
 - **Test Quality**: Prioritize meaningful assertions over empty coverage metrics

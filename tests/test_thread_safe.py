@@ -268,4 +268,4 @@ def test_standalone_class_access_returns_descriptor():
 def test_class_getitem():
     """thread_safe_cached_property supports subscript for type annotations."""
     alias = thread_safe_cached_property[int]
-    assert alias is thread_safe_cached_property
+    assert alias.__origin__ is thread_safe_cached_property
