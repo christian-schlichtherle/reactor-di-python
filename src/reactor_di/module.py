@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import threading
 from functools import cached_property
-from typing import Any, Callable, Type, Union, get_type_hints
+from typing import Any, Callable, get_type_hints
 
 from .caching import CachingStrategy, thread_safe_cached_property
 from .type_utils import (
@@ -71,8 +71,8 @@ def _resolve_dep_locked(
 
 
 def _create_factory_method(
-    attr_type: Type[Any], caching_strategy: CachingStrategy
-) -> Union[property, cached_property[Any], thread_safe_cached_property]:
+    attr_type: type[Any], caching_strategy: CachingStrategy
+) -> property | cached_property[Any] | thread_safe_cached_property:
     """Create a factory method for a dependency.
 
     Generates a property that lazily instantiates dependencies. The factory
@@ -160,8 +160,8 @@ def _create_factory_method(
 
 
 def _apply_module_decorator(
-    class_type: Type[Any], caching_strategy: CachingStrategy
-) -> Type[Any]:
+    class_type: type[Any], caching_strategy: CachingStrategy
+) -> type[Any]:
     """Apply the module decorator to a class.
 
     Processes all type-annotated attributes and creates factory methods for
@@ -210,8 +210,8 @@ def _apply_module_decorator(
 
 
 def module(
-    class_or_strategy: Union[Type[Any], CachingStrategy, None] = None, /
-) -> Union[Type[Any], Callable[[Type[Any]], Type[Any]]]:
+    class_or_strategy: type[Any] | CachingStrategy | None = None, /
+) -> type[Any] | Callable[[type[Any]], type[Any]]:
     """Module decorator for dependency injection.
 
     This decorator automatically creates factory methods for annotated

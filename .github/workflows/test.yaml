@@ -21,7 +21,7 @@ jobs:
       - name: Run tests with coverage
         if: inputs.run-coverage
         run: uv run pytest --cov
-      - if: inputs.run-coverage && matrix.python-version == '3.8'
+      - if: inputs.run-coverage && matrix.python-version == '3.9'
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
@@ -35,7 +35,7 @@ on:
     inputs:
       python-versions:
         type: string
-        default: '["3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]'
+        default: '["3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]'
       run-coverage:
         type: boolean
         default: true

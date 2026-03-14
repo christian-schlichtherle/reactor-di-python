@@ -1,7 +1,7 @@
 """Type utilities for dependency injection and attribute resolution.
 
 Provides type checking and analysis utilities for the Reactor DI system.
-Simplified after removing unnecessary defensive programming - Python 3.8+
+Simplified after removing unnecessary defensive programming - Python 3.9+
 type hint APIs are stable and don't require extensive error handling.
 
 Key features:
@@ -13,7 +13,7 @@ Key features:
 
 import inspect
 import re
-from typing import Any, Final, List, Tuple, Type
+from typing import Any, Final
 
 # Constants for internal attribute names
 SETUP_DEPENDENCIES_ATTR: Final[str] = "_reactor_di_setup_dependencies"
@@ -21,7 +21,7 @@ DEPENDENCY_MAP_ATTR: Final[str] = "_reactor_di_dependency_map"
 MODULE_INSTANCE_ATTR: Final[str] = "_reactor_di_module_instance"
 REACTOR_DI_LOCK_ATTR: Final[str] = "_reactor_di_lock"
 
-_PRIMITIVE_EQUIVALENT_TYPES: Final[Tuple[Type[Any], ...]] = (
+_PRIMITIVE_EQUIVALENT_TYPES: Final[tuple[type[Any], ...]] = (
     int,
     float,
     str,
@@ -36,7 +36,7 @@ _PRIMITIVE_EQUIVALENT_TYPES: Final[Tuple[Type[Any], ...]] = (
 )
 
 
-def get_alternative_names(name: str, default_prefix: str = "_") -> List[str]:
+def get_alternative_names(name: str, default_prefix: str = "_") -> list[str]:
     """Generate alternative names based on naming conventions.
 
     Creates a list of name variations by removing common prefixes.
@@ -61,7 +61,7 @@ def get_alternative_names(name: str, default_prefix: str = "_") -> List[str]:
     )
 
 
-def is_primitive_type(attr_type: Type[Any]) -> bool:
+def is_primitive_type(attr_type: type[Any]) -> bool:
     """Check if a type should be treated as primitive.
 
     Args:
@@ -73,7 +73,7 @@ def is_primitive_type(attr_type: Type[Any]) -> bool:
     return attr_type in _PRIMITIVE_EQUIVALENT_TYPES
 
 
-def has_constructor_assignment(class_type: Type[Any], attr_name: str) -> bool:
+def has_constructor_assignment(class_type: type[Any], attr_name: str) -> bool:
     """Check if a class constructor assigns to a specific attribute.
 
     Uses regex to detect attribute assignments in __init__ source code.

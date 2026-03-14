@@ -6,7 +6,7 @@ behavior, silently skipping attributes that cannot be resolved.
 """
 
 import inspect
-from typing import Any, Callable, Type, get_type_hints
+from typing import Any, Callable, get_type_hints
 
 from .type_utils import (
     SETUP_DEPENDENCIES_ATTR,
@@ -37,7 +37,7 @@ class _DeferredProperty:
         self.base_ref = base_ref
         self.target_attr_name = target_attr_name
 
-    def __get__(self, instance: Any, owner: Type[Any]) -> Any:
+    def __get__(self, instance: Any, owner: type[Any]) -> Any:
         """Get the forwarded attribute value.
 
         Args:
@@ -68,7 +68,7 @@ class _DeferredProperty:
 
 
 def _can_resolve_attribute(
-    class_type: Type[Any],
+    class_type: type[Any],
     base_ref: str,
     target_attr_name: str,
 ) -> bool:
@@ -145,7 +145,7 @@ def law_of_demeter(
     base_ref: str,
     *,
     prefix: str = "_",
-) -> Callable[[Type[Any]], Type[Any]]:
+) -> Callable[[type[Any]], type[Any]]:
     """Law of Demeter decorator for property forwarding.
 
     This decorator automatically creates forwarding properties for annotated
@@ -172,7 +172,7 @@ def law_of_demeter(
         30
     """
 
-    def decorator(class_type: Type[Any]) -> Type[Any]:
+    def decorator(class_type: type[Any]) -> type[Any]:
         """Apply the Law of Demeter decorator to a class.
 
         Args:

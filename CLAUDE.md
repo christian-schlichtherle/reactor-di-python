@@ -8,7 +8,7 @@ A code generator for dependency injection (DI) in Python based on the mediator a
 
 ## Development Environment
 
-- **Python Version**: 3.9 for development (requires 3.8+ due to `@cached_property`)
+- **Python Version**: 3.9+ (minimum supported version)
 - **Package Manager**: `uv` for dependency management
 - **Project Layout**: Modern src-layout structure
 - **Build System**: `hatchling` with `hatch-vcs` for automatic git tag versioning
@@ -44,7 +44,7 @@ reactor-di-python/
 │   ├── __init__.py             # Package initialization
 │   ├── module.py               # @module decorator for DI containers
 │   ├── law_of_demeter.py       # @law_of_demeter decorator for property forwarding
-│   ├── caching.py              # CachingStrategy enum for component caching
+│   ├── caching.py              # CachingStrategy enum and thread_safe_cached_property descriptor
 │   ├── type_utils.py           # Shared type checking utilities
 │   └── py.typed                # Type marker for mypy
 ├── tests/                      # Regression and unit tests (38 tests)
@@ -57,7 +57,7 @@ reactor-di-python/
 │   ├── test_module_integration.py # Module + law_of_demeter integration tests
 │   ├── test_pure_hasattr.py    # pure_hasattr utility tests (14 tests)
 │   ├── test_side_effects.py    # Side effects isolation tests
-│   └── test_thread_safe.py     # Thread-safe caching strategy tests (7 tests)
+│   └── test_thread_safe.py     # Thread-safe caching strategy tests (12 tests)
 ├── examples/                   # Testable examples (22 tests, acts as test suite)
 │   ├── __init__.py             # Package initialization
 │   ├── quick_start.py          # Quick Start example as tests (4 tests)
@@ -97,18 +97,18 @@ Simplified utilities that enable type-safe DI across both decorators:
 
 ### Key Architectural Patterns
 - **Mediator Pattern**: `@module` acts as central coordinator for all dependencies
-- **Factory Pattern**: Generates `@cached_property`, `property`, or `_ThreadSafeCachedProperty` methods for object creation
+- **Factory Pattern**: Generates `@cached_property`, `property`, or `@thread_safe_cached_property` methods for object creation
 - **Lazy Per-Attribute Resolution**: Dependencies from `@module` are resolved individually on first access via `__getattr__`, not eagerly all at once
 - **Deferred Resolution**: `_DeferredProperty` class handles runtime attribute forwarding for `@law_of_demeter`
 - **Pluggable Caching**: `CachingStrategy` enum applied at decoration time
 - **Safe Forward Reference Handling**: `get_type_hints()` fallback to raw `__annotations__` for `TYPE_CHECKING` imports
-- **Simplified Error Handling**: Removed unnecessary defensive programming for Python 3.8+ stable APIs
+- **Simplified Error Handling**: Removed unnecessary defensive programming for Python 3.9+ stable APIs
 
 ## Testing Strategy
 
 - **Coverage Achievement**: 90% test coverage requirement (focused on realistic scenarios)
 - **Framework**: pytest with pytest-cov
-- **Matrix Testing**: Python 3.8, 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
+- **Matrix Testing**: Python 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
 - **Test Architecture**:
   - **Unit/Regression Tests**: Bug regression tests and utility tests in `tests/` (38 tests)
   - **Example Tests**: Real-world usage patterns as executable tests in `examples/` (22 tests)
@@ -163,14 +163,14 @@ Simplified utilities that enable type-safe DI across both decorators:
 - Comprehensive testing with coverage enforcement
 - Automated CI/CD with GitHub Actions
 - Static type checking with mypy for type safety and None checks
-- Code quality with ruff (linting) and black (formatting) - configured for Python 3.8+ compatibility
+- Code quality with ruff (linting) and black (formatting) - configured for Python 3.9+
 - Secure PyPI deployment with trusted publishing
 
 ## Recent Updates
 
 ### Feature: Thread-Safe Caching Strategy (Latest)
 - Added `CachingStrategy.THREAD_SAFE` for singleton components with thread-safe guarantees
-- `_ThreadSafeCachedProperty` descriptor uses double-checked locking with per-instance, per-attribute locks
+- `thread_safe_cached_property` descriptor (in `caching.py`) uses double-checked locking with per-instance, per-attribute locks
 - Fast path (already cached) is a single `__dict__` lookup with no locking overhead
 - Thread-safe `_module_getattr`: lazy dependency resolution acquires a per-instance lock (`REACTOR_DI_LOCK_ATTR`) when resolving dependencies for `THREAD_SAFE` modules
 - Only `THREAD_SAFE` modules pay the locking cost — `NOT_THREAD_SAFE` and `DISABLED` are unchanged
@@ -208,11 +208,7 @@ Simplified utilities that enable type-safe DI across both decorators:
 - Simplified module.py with clearer error messages and removed unused imports
 - Streamlined type checking by removing unnecessary try-except blocks
 - Uses walrus operator (`:=`) for cleaner conditionals (Python 3.8+)
-
-### Python 3.8 Compatibility
-- Added `from __future__ import annotations` to support modern type syntax
-- Disabled ruff rules UP006 and UP007 that require Python 3.9+ syntax
-- Maintained use of `Type[Any]` and `Union[...]` for broader compatibility
+- Uses PEP 585 built-in generics (`list`, `tuple`, `type`) and PEP 604 union syntax (`X | Y`) with `from __future__ import annotations` for Python 3.9 compatibility
 
 ### Testing Infrastructure
 - Single dependency group combining dev and test tools for simplicity

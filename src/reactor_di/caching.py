@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import threading
 from enum import Enum
-from typing import Any, Callable, Type
+from typing import Any, Callable
 
 
 class CachingStrategy(Enum):
@@ -42,11 +42,11 @@ class thread_safe_cached_property:
         self.attr_name: str = ""
         self.lock_name: str = ""
 
-    def __set_name__(self, owner: Type[Any], name: str) -> None:
+    def __set_name__(self, owner: type[Any], name: str) -> None:
         self.attr_name = name
         self.lock_name = f"_lock_{name}"
 
-    def __get__(self, instance: Any, owner: Type[Any] | None = None) -> Any:
+    def __get__(self, instance: Any, owner: type[Any] | None = None) -> Any:
         if instance is None:
             return self
         # Fast path: already cached in instance dict
