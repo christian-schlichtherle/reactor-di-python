@@ -183,6 +183,14 @@ app = AppModule()
 assert app.cache_module.db is app.db  # same instance
 ```
 
+An optional second parameter renames the lookup — the child uses a different local name than the parent's attribute:
+
+```python
+@module(CachingStrategy.NOT_THREAD_SAFE)
+class AuditModule:
+    connection: lookup[DatabaseConnection, "db"]  # look up "db" on parent, bind as "connection"
+```
+
 On a component (non-module class), `lookup` is a no-op — the type is unwrapped and dependency resolution proceeds normally.
 
 ### Custom Prefixes
@@ -245,12 +253,17 @@ class Service:
 
 Marks a module annotation as a dependency that should be resolved from the parent module rather than being created locally. On a module, `@module` skips factory generation and installs a lightweight property; the actual value is injected lazily by the parent. On a component, `lookup` is a no-op.
 
+**Parameters:**
+- First (required): The type of the dependency
+- Second (optional): Name of the attribute to look up on the parent module. Defaults to the annotation's own name.
+
 **Usage:**
 ```python
 @module(CachingStrategy.NOT_THREAD_SAFE)
 class ChildModule:
-    shared_db: lookup[DatabaseConnection]  # resolved from parent
-    local_service: MyService               # created locally
+    shared_db: lookup[DatabaseConnection]              # lookup "shared_db" on parent
+    connection: lookup[DatabaseConnection, "db"]        # lookup "db" on parent, bind as "connection"
+    local_service: MyService                           # created locally
 ```
 
 ### Type Utilities
@@ -307,14 +320,14 @@ This project uses modern Python tooling and best practices:
 ### Running Tests
 
 ```bash
-# Run all tests (76 tests: 27 examples + 49 regression/unit tests)
+# Run all tests (78 tests: 29 examples + 49 regression/unit tests)
 uv run pytest
 
 # Run tests with coverage and HTML/terminal reports
 uv run pytest --cov
 
 # Run example tests only
-uv run pytest examples/                     # Run all examples as tests (27 tests)
+uv run pytest examples/                     # Run all examples as tests (29 tests)
 uv run pytest examples/caching_strategy.py  # Caching strategy examples (5 tests)
 uv run pytest examples/custom_prefix.py     # Custom prefix examples (6 tests)
 uv run pytest examples/quick_start.py       # Quick start examples (4 tests)

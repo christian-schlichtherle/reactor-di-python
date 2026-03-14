@@ -8,6 +8,10 @@ decorator does NOT generate a factory for it.  Instead, a lightweight
 dict-backed property is installed so the name is visible to child
 component factories.  The actual value is injected lazily by the parent
 module through the existing dependency-map mechanism.
+
+An optional second parameter renames the lookup::
+
+    conn: lookup[DatabaseConnection, "db"]   # look up "db" on parent, bind as "conn"
 """
 
 from reactor_di import CachingStrategy, law_of_demeter, lookup, module
@@ -209,3 +213,65 @@ def test_deeply_nested_lookup():
     assert root.middle_module.db is root.db
     assert root.middle_module.cache_module.db is root.db
     assert root.middle_module.cache_module.cache_config.ttl == 300
+
+
+# ---------------------------------------------------------------------------
+# Renamed lookup: local name differs from parent attribute name
+# ---------------------------------------------------------------------------
+
+
+@module(CachingStrategy.NOT_THREAD_SAFE)
+class AuditModule:
+    """Child module where the local name differs from the parent's attribute.
+
+    The parent provides ``db``, but this module binds it as ``connection``.
+    """
+
+    connection: lookup[DatabaseConnection, "db"]  # noqa: F821  # look up "db" on parent
+
+
+@module(CachingStrategy.NOT_THREAD_SAFE)
+class AppModuleWithRename:
+    db: DatabaseConnection
+    audit_module: AuditModule
+
+
+def test_renamed_lookup():
+    """lookup[Type, "name"] resolves the parent's attribute under a different local name."""
+    app = AppModuleWithRename()
+
+    assert app.audit_module.connection is app.db
+
+
+@law_of_demeter("_connection")
+class AuditService:
+    _connection: DatabaseConnection
+
+    def __init__(self) -> None:
+        pass
+
+    def log(self) -> str:
+        return self._connection.query("INSERT INTO audit_log VALUES (...)")
+
+
+@module(CachingStrategy.NOT_THREAD_SAFE)
+class AuditModuleWithComponent:
+    """Renamed lookup feeding into a local component."""
+
+    connection: lookup[DatabaseConnection, "db"]  # noqa: F821
+    audit_service: AuditService
+
+
+@module(CachingStrategy.NOT_THREAD_SAFE)
+class AppModuleWithRenameAndComponent:
+    db: DatabaseConnection
+    audit_module: AuditModuleWithComponent
+
+
+def test_renamed_lookup_feeds_component():
+    """A renamed lookup dependency is visible to child-component factories."""
+    app = AppModuleWithRenameAndComponent()
+
+    assert app.audit_module.audit_service._connection is app.db
+    result = app.audit_module.audit_service.log()
+    assert "INSERT INTO audit_log" in result

@@ -26,18 +26,22 @@ REACTOR_DI_LOCK_ATTR: Final[str] = "_reactor_di_lock"
 
 
 class _LookupMarker:
-    """Internal wrapper returned by ``lookup[Type]``.
+    """Internal wrapper returned by ``lookup[Type]`` or ``lookup[Type, "name"]``.
 
-    Stores the inner type so that decorators can detect and unwrap it.
+    Stores the inner type and an optional *source_name* override so that
+    decorators can detect, unwrap, and remap the dependency.
     """
 
-    __slots__ = ("inner_type",)
+    __slots__ = ("inner_type", "source_name")
 
-    def __init__(self, inner_type: type[Any]) -> None:
+    def __init__(self, inner_type: type[Any], source_name: str | None = None) -> None:
         self.inner_type = inner_type
+        self.source_name = source_name
 
     def __repr__(self) -> str:
         name = getattr(self.inner_type, "__name__", repr(self.inner_type))
+        if self.source_name is not None:
+            return f'lookup[{name}, "{self.source_name}"]'
         return f"lookup[{name}]"
 
 
@@ -48,8 +52,12 @@ class lookup:
 
         @module(CachingStrategy.NOT_THREAD_SAFE)
         class ChildModule:
-            db: lookup[DatabaseConnection]   # resolved from parent module
-            service: MyService               # created locally as usual
+            db: lookup[DatabaseConnection]              # lookup "db" on parent
+            conn: lookup[DatabaseConnection, "db"]      # lookup "db" on parent, bind to "conn"
+            service: MyService                          # created locally as usual
+
+    The optional second parameter names the attribute to look up on the
+    parent module.  When omitted, the annotation's own name is used.
 
     On a **module**, ``@module`` skips factory generation and installs a
     lightweight property so the name is visible to child-component factories.
@@ -62,6 +70,8 @@ class lookup:
     """
 
     def __class_getitem__(cls, params: Any) -> _LookupMarker:
+        if isinstance(params, tuple):
+            return _LookupMarker(*params)
         return _LookupMarker(params)
 
     def __init_subclass__(cls, **kwargs: Any) -> None:

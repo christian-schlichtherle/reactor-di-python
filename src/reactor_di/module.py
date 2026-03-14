@@ -120,7 +120,12 @@ def _create_factory_method(
 
         # For each dependency needed by the instance, build a mapping
         # from dep name to module attribute using naming conventions
-        for dep_name in dep_names:
+        for dep_name, dep_type in dep_names.items():
+            # lookup[Type, "name"] — explicit source name override
+            if is_lookup_type(dep_type) and dep_type.source_name is not None:
+                if pure_hasattr(module_instance, dep_type.source_name):
+                    dependency_map[dep_name] = dep_type.source_name
+                continue
             # Direct match: dependency name matches module_instance attribute
             if pure_hasattr(module_instance, dep_name):
                 dependency_map[dep_name] = dep_name
