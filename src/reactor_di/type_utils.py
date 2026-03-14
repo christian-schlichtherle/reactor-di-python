@@ -111,6 +111,74 @@ def has_constructor_assignment(class_type: type[Any], attr_name: str) -> bool:
     )
 
 
+def resolve_abstract_property_conflicts(cls: type[Any]) -> None:
+    """Replace inherited abstract @properties that collide with DI annotations.
+
+    When a class has type annotations whose names match inherited abstract
+    @property methods, the property descriptor (a data descriptor) takes MRO
+    priority over ``__getattr__``, preventing lazy DI resolution.  This function
+    detects such collisions and installs concrete ``@property`` descriptors
+    backed by ``instance.__dict__``, then removes them from
+    ``__abstractmethods__`` so the class can be instantiated.
+
+    Safe to call multiple times — skips names that are no longer abstract.
+    """
+    abstracts: frozenset[str] = getattr(cls, "__abstractmethods__", frozenset())
+    if not abstracts:
+        return
+
+    # Gather all annotation names across the MRO
+    annotations: set[str] = set()
+    for klass in cls.__mro__:
+        if klass is not object:
+            annotations.update(getattr(klass, "__annotations__", {}))
+
+    resolved: set[str] = set()
+    for name in annotations:
+        if name not in abstracts:
+            continue
+        # Verify the abstract method is actually a @property on a parent class
+        for parent in cls.__mro__[1:]:
+            if name in parent.__dict__:
+                attr = parent.__dict__[name]
+                if isinstance(attr, property) and getattr(
+                    attr.fget, "__isabstractmethod__", False
+                ):
+                    _install_dict_backed_property(cls, name)
+                    resolved.add(name)
+                break
+
+    if resolved:
+        cls.__abstractmethods__ = abstracts - resolved
+
+
+def _install_dict_backed_property(cls: type[Any], name: str) -> None:
+    """Install a concrete @property on *cls* that reads/writes ``__dict__``.
+
+    The getter checks ``__dict__`` first (fast path for already-resolved
+    values).  On a miss it delegates to the class's ``__getattr__`` — which
+    is typically ``_module_getattr`` installed by the ``@module`` factory —
+    to perform lazy DI resolution.
+    """
+
+    def _getter(self: Any) -> Any:
+        try:
+            return self.__dict__[name]
+        except KeyError:
+            # Delegate to __getattr__ for lazy DI resolution
+            ga = type(self).__dict__.get("__getattr__")
+            if ga is not None:
+                return ga(self, name)
+            raise AttributeError(
+                f"'{type(self).__name__}' object has no attribute '{name}'"
+            ) from None
+
+    def _setter(self: Any, value: Any) -> None:
+        self.__dict__[name] = value
+
+    setattr(cls, name, property(_getter, _setter))
+
+
 def pure_hasattr(obj: Any, attr_name: str) -> bool:
     """Check if an attribute exists without side effects like triggering descriptors/properties."""
     try:

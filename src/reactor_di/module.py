@@ -18,6 +18,7 @@ from .type_utils import (
     REACTOR_DI_LOCK_ATTR,
     is_primitive_type,
     pure_hasattr,
+    resolve_abstract_property_conflicts,
 )
 
 
@@ -86,6 +87,10 @@ def _create_factory_method(
     Returns:
         A property or cached_property that creates the dependency.
     """
+
+    # Resolve abstract @property conflicts before the factory runs.
+    # Idempotent — skips if already resolved by @law_of_demeter.
+    resolve_abstract_property_conflicts(attr_type)
 
     def factory(module_instance: Any) -> Any:
         """Factory function that creates the dependency.

@@ -47,7 +47,7 @@ reactor-di-python/
 │   ├── caching.py              # CachingStrategy enum and thread_safe_cached_property descriptor
 │   ├── type_utils.py           # Shared type checking utilities
 │   └── py.typed                # Type marker for mypy
-├── tests/                      # Regression and unit tests (46 tests)
+├── tests/                      # Regression and unit tests (49 tests)
 │   ├── __init__.py             # Package initialization
 │   ├── config.py               # Test config fixture
 │   ├── database.py             # Test database fixture
@@ -93,6 +93,7 @@ Simplified utilities that enable type-safe DI across both decorators:
 - **`get_alternative_names()`**: Generates name variations for dependency mapping (e.g., `_config` → `config`)
 - **`has_constructor_assignment()`**: Detects attribute assignments in constructor source code
 - **`is_primitive_type()`**: Identifies primitive types that shouldn't be auto-instantiated
+- **`resolve_abstract_property_conflicts()`**: Replaces inherited abstract `@property` descriptors that collide with DI annotations, installing concrete dict-backed properties so `__getattr__` DI resolution works
 - **`pure_hasattr()`**: Checks attribute existence without triggering descriptors or properties
 - **Internal Constants**: `DEPENDENCY_MAP_ATTR`, `MODULE_INSTANCE_ATTR` for lazy dependency resolution; `REACTOR_DI_LOCK_ATTR` for thread-safe locking; `SETUP_DEPENDENCIES_ATTR` for backward-compatible deferred setup
 
@@ -103,6 +104,7 @@ Simplified utilities that enable type-safe DI across both decorators:
 - **Deferred Resolution**: `_DeferredProperty` class handles runtime attribute forwarding for `@law_of_demeter`
 - **Pluggable Caching**: `CachingStrategy` enum applied at decoration time
 - **Safe Forward Reference Handling**: `get_type_hints()` fallback to raw `__annotations__` for `TYPE_CHECKING` imports
+- **Abstract Property Conflict Resolution**: Automatically replaces inherited abstract `@property` descriptors that collide with DI annotations
 - **Simplified Error Handling**: Removed unnecessary defensive programming for Python 3.9+ stable APIs
 
 ## Testing Strategy
@@ -111,7 +113,7 @@ Simplified utilities that enable type-safe DI across both decorators:
 - **Framework**: pytest with pytest-cov
 - **Matrix Testing**: Python 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
 - **Test Architecture**:
-  - **Unit/Regression Tests**: Bug regression tests and utility tests in `tests/` (46 tests)
+  - **Unit/Regression Tests**: Bug regression tests and utility tests in `tests/` (49 tests)
   - **Example Tests**: Real-world usage patterns as executable tests in `examples/` (22 tests)
   - **Streamlined Configuration**: Minimal pytest configuration for essential functionality
 - **Test Quality**: Prioritize meaningful assertions over empty coverage metrics
@@ -169,7 +171,14 @@ Simplified utilities that enable type-safe DI across both decorators:
 
 ## Recent Updates
 
-### Feature: Thread-Safe Caching Strategy (Latest)
+### Bug Fix: Abstract Property Conflicts with DI Resolution (Latest)
+- Fixed `TypeError` / shadowed DI when a component class inherits abstract `@property` methods from an ABC that collide with DI annotation names
+- `resolve_abstract_property_conflicts()` in `type_utils.py` detects collisions and installs concrete `@property` descriptors backed by `instance.__dict__`, then removes them from `__abstractmethods__`
+- `_install_dict_backed_property()` creates getter (fast-path `__dict__` lookup, fallback to `__getattr__` for lazy DI) and setter
+- Called by both `@law_of_demeter` (before processing annotations) and `@module` factory (before creating dependencies) — idempotent, skips already-resolved names
+- Added 3 regression tests in `tests/test_module_integration.py` covering DI resolution, `@law_of_demeter` forwarding, and direct instantiation with abstract property conflicts
+
+### Feature: Thread-Safe Caching Strategy
 - Added `CachingStrategy.THREAD_SAFE` for singleton components with thread-safe guarantees
 - `thread_safe_cached_property` descriptor (in `caching.py`) uses double-checked locking with per-instance, per-attribute locks
 - Fast path (already cached) is a single `__dict__` lookup with no locking overhead

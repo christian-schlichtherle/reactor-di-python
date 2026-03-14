@@ -12,6 +12,7 @@ from .type_utils import (
     SETUP_DEPENDENCIES_ATTR,
     get_alternative_names,
     has_constructor_assignment,
+    resolve_abstract_property_conflicts,
 )
 
 
@@ -181,6 +182,12 @@ def law_of_demeter(
         Returns:
             The decorated class with forwarding properties.
         """
+        # Resolve abstract @property conflicts before processing annotations.
+        # If a parent ABC declares an abstract @property with the same name
+        # as a DI annotation, install a concrete property backed by __dict__
+        # so the class can be instantiated and DI resolution isn't shadowed.
+        resolve_abstract_property_conflicts(class_type)
+
         # Process each annotated attribute
         for attr_name in get_type_hints(class_type):
             # Special case: if this is the base reference itself, it must not get forwarded

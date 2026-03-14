@@ -5,9 +5,15 @@ config classes: annotation-only fields not being forwarded, and class-level
 __getattribute__ pollution from the module factory.
 """
 
+from abc import ABC, abstractmethod
 from functools import cached_property
 
-from reactor_di import CachingStrategy, law_of_demeter, module
+from reactor_di import (
+    CachingStrategy,
+    law_of_demeter,
+    module,
+    thread_safe_cached_property,
+)
 
 
 class AnnotationOnlyConfig:
@@ -221,3 +227,98 @@ def test_caching_strategy():
     assert app.processor is app.processor
     assert app.client is app.client
     assert app.config is app.config
+
+
+# --- Tests for Bug 3: abstract property shadows __getattr__ DI resolution ---
+
+
+class CaptureBase(ABC):
+    """ABC with abstract properties that match DI dependency names."""
+
+    @property
+    @abstractmethod
+    def output_queue(self) -> object:
+        pass
+
+    @abstractmethod
+    def run(self) -> None:
+        pass
+
+
+class SomeConfig:
+    WIDTH: int = 1920
+    HEIGHT: int = 1080
+
+
+@law_of_demeter("config")
+class CameraWorker(CaptureBase):
+    """Component inheriting ABC abstract properties that collide with DI deps.
+
+    `output_queue` is both an abstract property on CaptureBase
+    and a DI dependency that should be injected from the module.
+    """
+
+    config: SomeConfig
+    output_queue: object  # DI annotation — same name as abstract property
+
+    _WIDTH: int
+    _HEIGHT: int
+
+    def __init__(self) -> None:
+        pass
+
+    def run(self) -> None:
+        pass
+
+
+@module(CachingStrategy.THREAD_SAFE)
+class CameraModule:
+    """Module that wires a component with abstract-property DI conflicts."""
+
+    some_config: SomeConfig
+
+    @thread_safe_cached_property
+    def output_queue(self) -> object:
+        return ["queue-sentinel"]
+
+    camera_worker: CameraWorker
+
+    # Alias: CameraWorker's `config` annotation resolves via name match
+    @thread_safe_cached_property
+    def config(self) -> SomeConfig:
+        return SomeConfig()
+
+
+def test_abstract_property_does_not_shadow_di_resolution():
+    """DI injection must work even when the dependency name matches an abstract property.
+
+    The ABC declares `output_queue` as an abstract @property.  CameraWorker
+    declares `output_queue: object` as a DI annotation.  The @module factory
+    must ensure that `camera_worker.output_queue` resolves from the module
+    rather than hitting the (no longer useful) abstract property descriptor.
+    """
+    m = CameraModule()
+    worker = m.camera_worker
+
+    # output_queue should be the module's queue, not an abstract property error
+    assert worker.output_queue == ["queue-sentinel"]
+    assert worker.output_queue is m.output_queue
+
+
+def test_abstract_property_di_with_law_of_demeter():
+    """@law_of_demeter forwarding must also work alongside abstract property DI."""
+    m = CameraModule()
+    worker = m.camera_worker
+
+    assert worker._WIDTH == 1920
+    assert worker._HEIGHT == 1080
+
+
+def test_abstract_property_di_direct_instantiation():
+    """Direct instantiation with manual wiring must still work."""
+    worker = CameraWorker()
+    worker.config = SomeConfig()
+    worker.__dict__["output_queue"] = "manual-queue"
+
+    assert worker.output_queue == "manual-queue"
+    assert worker._WIDTH == 1920

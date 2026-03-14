@@ -18,6 +18,7 @@ A code generator for dependency injection (DI) in Python which is based on the m
 - **Lazy dependency resolution**: Dependencies resolved individually on first access, supporting deferred initialization patterns (e.g., async context managers)
 - **TYPE_CHECKING compatible**: Works with `if TYPE_CHECKING:` imports for circular dependency avoidance
 - **Pydantic compatible**: Works with Pydantic BaseSettings/BaseModel annotation-only fields
+- **ABC compatible**: Automatic resolution of abstract `@property` conflicts with DI annotations
 - **Python 3.9+ support**: Tested on Python 3.9 through 3.14
 
 ## Installation
@@ -87,9 +88,9 @@ All examples are automatically tested as part of the CI pipeline to ensure they 
 
 ## Tests
 
-The `tests/` directory contains regression and unit tests (46 tests):
+The `tests/` directory contains regression and unit tests (49 tests):
 
-- **`test_module_integration.py`** - Module + law_of_demeter integration with annotation-only configs (Pydantic compatibility)
+- **`test_module_integration.py`** - Module + law_of_demeter integration with annotation-only configs, Pydantic compatibility, and abstract property conflict resolution
 - **`test_lazy_resolution.py`** - Lazy per-attribute resolution with deferred initialization patterns
 - **`test_forward_ref.py`** - TYPE_CHECKING forward reference handling in module factory
 - **`test_dataclass_law_of_demeter.py`** - Dataclass + stacked @law_of_demeter regression tests (3 tests)
@@ -229,6 +230,10 @@ Detects if a constructor assigns to an attribute using regex source analysis.
 
 Identifies primitive types (int, str, bool, etc.) that shouldn't be auto-instantiated.
 
+#### resolve_abstract_property_conflicts(cls: type[Any]) -> None
+
+Replaces inherited abstract `@property` methods that collide with DI annotations, installing concrete dict-backed properties so lazy DI resolution via `__getattr__` works correctly. Safe to call multiple times.
+
 #### pure_hasattr(obj: Any, attr_name: str) -> bool
 
 Checks if an attribute exists without side effects like triggering descriptors or properties. Used internally to avoid premature evaluation during dependency resolution.
@@ -263,7 +268,7 @@ This project uses modern Python tooling and best practices:
 ### Running Tests
 
 ```bash
-# Run all tests (68 tests: 22 examples + 46 regression/unit tests)
+# Run all tests (71 tests: 22 examples + 49 regression/unit tests)
 uv run pytest
 
 # Run tests with coverage and HTML/terminal reports
@@ -276,7 +281,7 @@ uv run pytest examples/custom_prefix.py     # Custom prefix examples (6 tests)
 uv run pytest examples/quick_start.py       # Quick start examples (4 tests)
 
 # Run regression/unit tests only
-uv run pytest tests/                        # Run all regression tests (46 tests)
+uv run pytest tests/                        # Run all regression tests (49 tests)
 ```
 
 ### Debugging in PyCharm
