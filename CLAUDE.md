@@ -59,13 +59,13 @@ reactor-di-python/
 │   ├── test_pure_hasattr.py    # pure_hasattr utility tests (14 tests)
 │   ├── test_side_effects.py    # Side effects isolation tests
 │   └── test_thread_safe.py     # Thread-safe caching strategy tests (12 tests)
-├── examples/                   # Testable examples (29 tests, acts as test suite)
+├── examples/                   # Testable examples (32 tests, acts as test suite)
 │   ├── __init__.py             # Package initialization
 │   ├── quick_start.py          # Quick Start example as tests (4 tests)
 │   ├── quick_start_advanced.py # Advanced quick start example (4 tests)
 │   ├── caching_strategy.py     # Caching strategy examples (5 tests)
 │   ├── custom_prefix.py        # Custom prefix examples (6 tests)
-│   ├── nested_modules.py       # Nested modules with lookup (7 tests)
+│   ├── nested_modules.py       # Nested modules and component-level lookup (10 tests)
 │   ├── side_effects.py         # Side effects testing (1 test)
 │   └── stacked_decorators.py   # Stacked decorators example (2 tests)
 ├── .github/workflows/          # CI/CD pipelines
@@ -87,7 +87,7 @@ This is a **code generator** for dependency injection, not a runtime DI framewor
 The decorators work together seamlessly without special configuration:
 - **`@law_of_demeter`** (`law_of_demeter.py`): Creates forwarding properties for explicitly annotated attributes
 - **`@module`** (`module.py`): Generates factory methods for dependency injection, recognizing properties created by `@law_of_demeter` as "already implemented"
-- **`lookup`** (`type_utils.py`): Annotation marker (`lookup[Type]`) that tells `@module` to skip factory generation and resolve the dependency from the parent module instead
+- **`lookup`** (`type_utils.py`): Annotation marker (`lookup[Type]`) for parent-module dependency resolution — on modules, tells `@module` to skip factory generation; on components, tells `@law_of_demeter` to skip forwarding so the module factory resolves it instead
 - **Validation Integration**: `@module` validates only unimplemented dependencies, allowing clean cooperation
 
 ### Type System Integration (`type_utils.py`)
@@ -95,7 +95,7 @@ Simplified utilities that enable type-safe DI across both decorators:
 - **`get_alternative_names()`**: Generates name variations for dependency mapping (e.g., `_config` → `config`)
 - **`has_constructor_assignment()`**: Detects attribute assignments in constructor source code
 - **`is_primitive_type()`**: Identifies primitive types that shouldn't be auto-instantiated
-- **`lookup`**: Annotation marker class — `lookup[Type]` tells `@module` to skip factory generation; `lookup[Type, "name"]` remaps to a different parent attribute; on components it's a no-op (unwrapped to inner type)
+- **`lookup`**: Annotation marker class — on modules, `lookup[Type]` tells `@module` to skip factory generation; on components, tells `@law_of_demeter` to skip forwarding so the module factory resolves it; `lookup[Type, "name"]` remaps to a different parent attribute
 - **`is_lookup_type()` / `unwrap_lookup()`**: Detection and unwrapping helpers for `lookup[Type]` annotations
 - **`resolve_abstract_property_conflicts()`**: Replaces inherited abstract `@property` descriptors that collide with DI annotations, installing concrete dict-backed properties so `__getattr__` DI resolution works
 - **`pure_hasattr()`**: Checks attribute existence without triggering descriptors or properties
@@ -104,7 +104,7 @@ Simplified utilities that enable type-safe DI across both decorators:
 ### Key Architectural Patterns
 - **Mediator Pattern**: `@module` acts as central coordinator for all dependencies
 - **Factory Pattern**: Generates `@cached_property`, `property`, or `@thread_safe_cached_property` methods for object creation
-- **Nested Modules with `lookup`**: Child modules use `lookup[Type]` to declare dependencies resolved from the parent module rather than being created locally
+- **`lookup` on Modules and Components**: `lookup[Type]` declares dependencies resolved from the parent module — on modules it skips factory generation, on components it prevents `@law_of_demeter` forwarding so the module factory handles resolution
 - **Lazy Per-Attribute Resolution**: Dependencies from `@module` are resolved individually on first access via `__getattr__`, not eagerly all at once
 - **Deferred Resolution**: `_DeferredProperty` class handles runtime attribute forwarding for `@law_of_demeter`
 - **Pluggable Caching**: `CachingStrategy` enum applied at decoration time
@@ -119,7 +119,7 @@ Simplified utilities that enable type-safe DI across both decorators:
 - **Matrix Testing**: Python 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
 - **Test Architecture**:
   - **Unit/Regression Tests**: Bug regression tests and utility tests in `tests/` (49 tests)
-  - **Example Tests**: Real-world usage patterns as executable tests in `examples/` (29 tests)
+  - **Example Tests**: Real-world usage patterns as executable tests in `examples/` (32 tests)
   - **Streamlined Configuration**: Minimal pytest configuration for essential functionality
 - **Test Quality**: Prioritize meaningful assertions over empty coverage metrics
 - **Realistic Testing**: Remove unrealistic defensive code rather than mock impossible scenarios
@@ -176,17 +176,18 @@ Simplified utilities that enable type-safe DI across both decorators:
 
 ## Recent Updates
 
-### Feature: Nested Modules with `lookup` (Latest)
+### Feature: `lookup` Annotation Marker (Latest)
 - Added `lookup` annotation marker in `type_utils.py` for parent-module dependency resolution
-- `lookup[Type]` on a module annotation tells `@module` to skip factory generation and install a dict-backed property instead
-- `lookup[Type, "name"]` allows remapping: look up `"name"` on the parent module but bind locally under the annotation's own name
+- `lookup[Type]` on a **module** annotation tells `@module` to skip factory generation and install a dict-backed property instead
+- `lookup[Type]` on a **component** annotation tells `@law_of_demeter` to skip forwarding — the parent module's factory resolves it through the dependency-map mechanism
+- `lookup[Type, "name"]` allows remapping: look up `"name"` on the parent module but bind locally under the annotation's own name (works on both modules and components)
 - The actual value is injected lazily by the parent module through the existing dependency-map mechanism
-- On a component, `lookup[Type]` is a no-op — `@law_of_demeter` unwraps it transparently via `unwrap_lookup()`
 - `_install_dict_backed_property` makes lookup names visible to `pure_hasattr` so child-component factories can build dependency maps
 - Modules can be nested to arbitrary depth — lookup chains through parent → child → grandchild
 - Added `_LookupMarker` internal class (with `inner_type` and optional `source_name`), `is_lookup_type()` and `unwrap_lookup()` helpers
+- `@law_of_demeter` imports `is_lookup_type` and skips `lookup`-annotated attributes in its processing loop
 - Exported `lookup` from `reactor_di.__init__`
-- Added 7 example tests in `examples/nested_modules.py` covering parent injection, component usage, sibling sharing, no-op on components, deep nesting, renamed lookup, and renamed lookup feeding components
+- Added 10 example tests in `examples/nested_modules.py` covering parent injection, component usage, sibling sharing, base_ref unwrapping, deep nesting, renamed lookup, renamed lookup feeding components, component-level lookup skipping forwarding, component-level renamed lookup, and end-to-end component lookup
 
 ### Bug Fix: Abstract Property Conflicts with DI Resolution
 - Fixed `TypeError` / shadowed DI when a component class inherits abstract `@property` methods from an ABC that collide with DI annotation names

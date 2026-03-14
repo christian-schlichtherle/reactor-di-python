@@ -12,6 +12,7 @@ from .type_utils import (
     SETUP_DEPENDENCIES_ATTR,
     get_alternative_names,
     has_constructor_assignment,
+    is_lookup_type,
     resolve_abstract_property_conflicts,
     unwrap_lookup,
 )
@@ -190,11 +191,14 @@ def law_of_demeter(
         resolve_abstract_property_conflicts(class_type)
 
         # Process each annotated attribute
-        for attr_name in get_type_hints(class_type):
+        for attr_name, attr_type in get_type_hints(class_type).items():
             # Special case: if this is the base reference itself, it must not get forwarded
             if attr_name == base_ref:
                 continue
             if hasattr(class_type, attr_name):
+                continue
+            # lookup[] dependencies come from the parent module, not the base ref
+            if is_lookup_type(attr_type):
                 continue
             if not attr_name.startswith(prefix):
                 continue

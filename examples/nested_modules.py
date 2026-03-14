@@ -1,13 +1,16 @@
-"""Example: Nested modules with lookup for parent dependency resolution.
+"""Example: Nested modules and component-level lookup for parent dependency resolution.
 
-Demonstrates how child modules can declare dependencies that should be
-resolved from their parent module rather than being created locally.
+Demonstrates how ``lookup[Type]`` works on both modules and components to
+declare dependencies that should be resolved from the parent module rather
+than being created locally or forwarded by ``@law_of_demeter``.
 
-When a module annotation is wrapped with ``lookup[X]``, the ``@module``
-decorator does NOT generate a factory for it.  Instead, a lightweight
-dict-backed property is installed so the name is visible to child
-component factories.  The actual value is injected lazily by the parent
-module through the existing dependency-map mechanism.
+**On a module**, ``@module`` skips factory generation and installs a
+dict-backed property.  The parent module injects the value lazily through
+the dependency-map mechanism.
+
+**On a component**, ``@law_of_demeter`` skips the attribute (does not create
+a forwarding property).  The parent module's factory resolves it through the
+standard dependency-map mechanism — just like any other injected dependency.
 
 An optional second parameter renames the lookup::
 
@@ -144,16 +147,12 @@ def test_sibling_modules_share_same_instance():
     assert user_db is app.db
 
 
-def test_lookup_is_noop_on_component():
-    """Using lookup on a plain component annotation has no effect.
-
-    The @module factory unwraps lookup[X] to X when processing component
-    annotations, so dependency resolution works normally.
-    """
+def test_lookup_on_base_ref_unwraps_for_forwarding():
+    """lookup on the base_ref is unwrapped so @law_of_demeter can forward properties."""
 
     @law_of_demeter("config")
     class ServiceWithLookupAnnotation:
-        config: lookup[DatabaseConfig]  # lookup is a no-op on components
+        config: lookup[DatabaseConfig]  # unwrapped for type resolution
         _host: str
         _port: int
 
@@ -167,7 +166,7 @@ def test_lookup_is_noop_on_component():
 
     m = ServiceModule()
 
-    # Service still gets its config injected normally
+    # Forwarding still works through the unwrapped base_ref type
     assert m.service._host == "db.example.com"
     assert m.service._port == 5432
 
@@ -275,3 +274,86 @@ def test_renamed_lookup_feeds_component():
     assert app.audit_module.audit_service._connection is app.db
     result = app.audit_module.audit_service.log()
     assert "INSERT INTO audit_log" in result
+
+
+# ---------------------------------------------------------------------------
+# Component-level lookup: lookup works on any component, not just modules
+# ---------------------------------------------------------------------------
+
+
+class Config:
+    timeout = 30
+    db = "connection_string"  # coincidentally shares a name with DatabaseConnection
+
+
+@law_of_demeter("_config")
+class ServiceWithComponentLookup:
+    """Component where _db should come from the parent module, not from config.
+
+    Config has a ``db`` attribute (a string), but ``_db`` is annotated with
+    ``lookup[DatabaseConnection]`` so @law_of_demeter skips it.  The parent
+    module's factory resolves it from the module's ``db`` attribute instead.
+    """
+
+    _config: Config
+    _timeout: int  # forwarded from config.timeout
+    _db: lookup[DatabaseConnection]  # from parent module, NOT forwarded from config
+
+    def __init__(self) -> None:
+        pass
+
+    def do_work(self) -> str:
+        return self._db.query(f"timeout={self._timeout}")
+
+
+@module(CachingStrategy.NOT_THREAD_SAFE)
+class ComponentLookupModule:
+    config: Config
+    db: DatabaseConnection
+    service: ServiceWithComponentLookup
+
+
+def test_component_lookup_skips_law_of_demeter_forwarding():
+    """lookup on a component prevents @law_of_demeter from forwarding it."""
+    m = ComponentLookupModule()
+
+    # _db comes from the module (DatabaseConnection), NOT from config.db (string)
+    assert isinstance(m.service._db, DatabaseConnection)
+    assert m.service._db is m.db
+    # _timeout is still forwarded from config
+    assert m.service._timeout == 30
+
+
+def test_component_lookup_with_rename():
+    """lookup[Type, "name"] on a component resolves from a renamed parent attribute."""
+
+    @law_of_demeter("_config")
+    class ServiceWithRenamedLookup:
+        _config: Config
+        _timeout: int  # forwarded from config
+        _conn: lookup[
+            DatabaseConnection, "db"  # noqa: F821
+        ]  # "db" on parent, bound as "_conn"
+
+        def __init__(self) -> None:
+            pass
+
+    @module(CachingStrategy.NOT_THREAD_SAFE)
+    class RenamedLookupModule:
+        config: Config
+        db: DatabaseConnection
+        service: ServiceWithRenamedLookup
+
+    m = RenamedLookupModule()
+
+    assert m.service._conn is m.db
+    assert m.service._timeout == 30
+
+
+def test_component_lookup_end_to_end():
+    """Full end-to-end: component with lookup dependencies works correctly."""
+    m = ComponentLookupModule()
+
+    result = m.service.do_work()
+    assert "timeout=30" in result
+    assert m.service._db.connected is True

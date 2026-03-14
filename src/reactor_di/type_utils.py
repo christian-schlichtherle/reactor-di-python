@@ -56,6 +56,12 @@ class lookup:
             conn: lookup[DatabaseConnection, "db"]      # lookup "db" on parent, bind to "conn"
             service: MyService                          # created locally as usual
 
+        @law_of_demeter("_config")
+        class MyComponent:
+            _config: Config
+            _timeout: int                               # forwarded from config
+            _db: lookup[DatabaseConnection]              # from parent module, NOT forwarded
+
     The optional second parameter names the attribute to look up on the
     parent module.  When omitted, the annotation's own name is used.
 
@@ -63,10 +69,11 @@ class lookup:
     lightweight property so the name is visible to child-component factories.
     The actual value is injected lazily by the parent module.
 
-    On a **component**, ``lookup`` is a no-op — the type is unwrapped and
-    dependency resolution proceeds as normal.
-
-    All other use is an error.
+    On a **component**, ``@law_of_demeter`` skips the attribute (does not
+    create a forwarding property for it).  The parent module's factory
+    resolves it through the standard dependency-map mechanism.  With
+    ``lookup[Type, "name"]``, the factory maps from the parent's ``name``
+    attribute to the component's local annotation name.
     """
 
     def __class_getitem__(cls, params: Any) -> _LookupMarker:
