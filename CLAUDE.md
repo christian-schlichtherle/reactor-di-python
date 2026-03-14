@@ -59,12 +59,13 @@ reactor-di-python/
 │   ├── test_pure_hasattr.py    # pure_hasattr utility tests (14 tests)
 │   ├── test_side_effects.py    # Side effects isolation tests
 │   └── test_thread_safe.py     # Thread-safe caching strategy tests (12 tests)
-├── examples/                   # Testable examples (32 tests, acts as test suite)
+├── examples/                   # Testable examples (39 tests, acts as test suite)
 │   ├── __init__.py             # Package initialization
 │   ├── quick_start.py          # Quick Start example as tests (4 tests)
 │   ├── quick_start_advanced.py # Advanced quick start example (4 tests)
 │   ├── caching_strategy.py     # Caching strategy examples (5 tests)
 │   ├── custom_prefix.py        # Custom prefix examples (6 tests)
+│   ├── make_marker.py          # Subtype factory generation with make[Base, Impl] (7 tests)
 │   ├── nested_modules.py       # Nested modules and component-level lookup (10 tests)
 │   ├── side_effects.py         # Side effects testing (1 test)
 │   └── stacked_decorators.py   # Stacked decorators example (2 tests)
@@ -88,6 +89,7 @@ The decorators work together seamlessly without special configuration:
 - **`@law_of_demeter`** (`law_of_demeter.py`): Creates forwarding properties for explicitly annotated attributes
 - **`@module`** (`module.py`): Generates factory methods for dependency injection, recognizing properties created by `@law_of_demeter` as "already implemented"
 - **`lookup`** (`type_utils.py`): Annotation marker (`lookup[Type]`) for parent-module dependency resolution — on modules, tells `@module` to skip factory generation; on components, tells `@law_of_demeter` to skip forwarding so the module factory resolves it instead
+- **`make`** (`type_utils.py`): Annotation marker (`make[BaseType, ImplType]`) for subtype factory generation — tells `@module` to instantiate `ImplType` instead of `BaseType`; on components, `@law_of_demeter` skips the attribute
 - **Validation Integration**: `@module` validates only unimplemented dependencies, allowing clean cooperation
 
 ### Type System Integration (`type_utils.py`)
@@ -97,6 +99,8 @@ Simplified utilities that enable type-safe DI across both decorators:
 - **`is_primitive_type()`**: Identifies primitive types that shouldn't be auto-instantiated
 - **`lookup`**: Annotation marker class — on modules, `lookup[Type]` tells `@module` to skip factory generation; on components, tells `@law_of_demeter` to skip forwarding so the module factory resolves it; `lookup[Type, "name"]` remaps to a different parent attribute
 - **`is_lookup_type()` / `unwrap_lookup()`**: Detection and unwrapping helpers for `lookup[Type]` annotations
+- **`make`**: Annotation marker class — `make[BaseType, ImplType]` tells `@module` to generate a factory that instantiates `ImplType` instead of `BaseType`; on components, `@law_of_demeter` skips the attribute
+- **`is_make_type()` / `unwrap_make()`**: Detection and unwrapping helpers for `make[BaseType, ImplType]` annotations
 - **`resolve_abstract_property_conflicts()`**: Replaces inherited abstract `@property` descriptors that collide with DI annotations, installing concrete dict-backed properties so `__getattr__` DI resolution works
 - **`pure_hasattr()`**: Checks attribute existence without triggering descriptors or properties
 - **Internal Constants**: `DEPENDENCY_MAP_ATTR`, `MODULE_INSTANCE_ATTR` for lazy dependency resolution; `REACTOR_DI_LOCK_ATTR` for thread-safe locking; `SETUP_DEPENDENCIES_ATTR` for backward-compatible deferred setup
@@ -105,6 +109,7 @@ Simplified utilities that enable type-safe DI across both decorators:
 - **Mediator Pattern**: `@module` acts as central coordinator for all dependencies
 - **Factory Pattern**: Generates `@cached_property`, `property`, or `@thread_safe_cached_property` methods for object creation
 - **`lookup` on Modules and Components**: `lookup[Type]` declares dependencies resolved from the parent module — on modules it skips factory generation, on components it prevents `@law_of_demeter` forwarding so the module factory handles resolution
+- **`make` for Subtype Factories**: `make[BaseType, ImplType]` generates a factory that instantiates `ImplType` instead of `BaseType`, enabling programming to interfaces while wiring concrete implementations
 - **Lazy Per-Attribute Resolution**: Dependencies from `@module` are resolved individually on first access via `__getattr__`, not eagerly all at once
 - **Deferred Resolution**: `_DeferredProperty` class handles runtime attribute forwarding for `@law_of_demeter`
 - **Pluggable Caching**: `CachingStrategy` enum applied at decoration time
@@ -119,7 +124,7 @@ Simplified utilities that enable type-safe DI across both decorators:
 - **Matrix Testing**: Python 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
 - **Test Architecture**:
   - **Unit/Regression Tests**: Bug regression tests and utility tests in `tests/` (49 tests)
-  - **Example Tests**: Real-world usage patterns as executable tests in `examples/` (32 tests)
+  - **Example Tests**: Real-world usage patterns as executable tests in `examples/` (39 tests)
   - **Streamlined Configuration**: Minimal pytest configuration for essential functionality
 - **Test Quality**: Prioritize meaningful assertions over empty coverage metrics
 - **Realistic Testing**: Remove unrealistic defensive code rather than mock impossible scenarios
@@ -176,7 +181,17 @@ Simplified utilities that enable type-safe DI across both decorators:
 
 ## Recent Updates
 
-### Feature: `lookup` Annotation Marker (Latest)
+### Feature: `make` Annotation Marker (Latest)
+- Added `make` annotation marker in `type_utils.py` for subtype factory generation
+- `make[BaseType, ImplType]` tells `@module` to generate a factory that instantiates `ImplType` instead of `BaseType`
+- Requires exactly two type parameters; raises `TypeError` otherwise
+- Added `_MakeMarker` internal class (with `base_type` and `impl_type`), `is_make_type()` and `unwrap_make()` helpers
+- `@module` detects `make` annotations and passes `impl_type` to `_create_factory_method`
+- `@law_of_demeter` skips `make`-annotated attributes (factory directive, not forwardable); `_can_resolve_attribute` unwraps `make` on the base_ref via `unwrap_make()` for type resolution
+- Exported `make` from `reactor_di.__init__`
+- Added 7 example tests in `examples/make_marker.py` covering basic usage, caching, implementation swapping, DI integration, `@law_of_demeter` forwarding, and disabled caching
+
+### Feature: `lookup` Annotation Marker
 - Added `lookup` annotation marker in `type_utils.py` for parent-module dependency resolution
 - `lookup[Type]` on a **module** annotation tells `@module` to skip factory generation and install a dict-backed property instead
 - `lookup[Type]` on a **component** annotation tells `@law_of_demeter` to skip forwarding — the parent module's factory resolves it through the dependency-map mechanism

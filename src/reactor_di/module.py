@@ -18,6 +18,7 @@ from .type_utils import (
     REACTOR_DI_LOCK_ATTR,
     _install_dict_backed_property,
     is_lookup_type,
+    is_make_type,
     is_primitive_type,
     pure_hasattr,
     resolve_abstract_property_conflicts,
@@ -201,6 +202,16 @@ def _apply_module_decorator(
         # injected lazily by the parent module's dependency-map mechanism.
         if is_lookup_type(attr_type):
             _install_dict_backed_property(class_type, attr_name)
+            continue
+
+        # make[Base, Impl] — factory instantiates Impl (a subtype of Base)
+        if is_make_type(attr_type):
+            factory_method = _create_factory_method(
+                attr_type.impl_type, caching_strategy
+            )
+            setattr(class_type, attr_name, factory_method)
+            if hasattr(factory_method, "__set_name__"):
+                factory_method.__set_name__(class_type, attr_name)
             continue
 
         if isinstance(attr_type, str):

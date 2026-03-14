@@ -9,6 +9,7 @@ Key features:
 - Primitive type detection to avoid instantiation
 - Constructor source analysis for attribute assignment detection
 - ``lookup`` annotation marker for parent-module dependency resolution
+- ``make`` annotation marker for subtype factory generation
 - Internal attribute constants for dependency tracking
 """
 
@@ -99,6 +100,74 @@ def unwrap_lookup(annotation: Any) -> Any:
     """Unwrap ``lookup[X]`` to ``X``.  Returns *annotation* unchanged otherwise."""
     if isinstance(annotation, _LookupMarker):
         return annotation.inner_type
+    return annotation
+
+
+class _MakeMarker:
+    """Internal wrapper returned by ``make[BaseType, ImplType]``.
+
+    Stores the base type (used for the property return annotation) and
+    the implementation type (actually instantiated by the factory).
+    """
+
+    __slots__ = ("base_type", "impl_type")
+
+    def __init__(self, base_type: type[Any], impl_type: type[Any]) -> None:
+        self.base_type = base_type
+        self.impl_type = impl_type
+
+    def __repr__(self) -> str:
+        base = getattr(self.base_type, "__name__", repr(self.base_type))
+        impl = getattr(self.impl_type, "__name__", repr(self.impl_type))
+        return f"make[{base}, {impl}]"
+
+
+class make:
+    """Annotation marker for subtype factory generation.
+
+    Usage::
+
+        @module(CachingStrategy.NOT_THREAD_SAFE)
+        class AppModule:
+            service: make[ServiceBase, ServiceImpl]   # factory returns ServiceImpl()
+
+    ``make[Foo, Bar]`` tells ``@module`` to generate a factory that
+    instantiates ``Bar`` (a subtype of ``Foo``).  The generated code is
+    equivalent to::
+
+        @cached_property
+        def service(self) -> ServiceBase:
+            return ServiceImpl()
+
+    On a **component** with ``@law_of_demeter``, ``make[Foo, Bar]`` is
+    unwrapped to ``Foo`` for attribute resolution purposes.
+    """
+
+    def __class_getitem__(cls, params: Any) -> _MakeMarker:
+        if not isinstance(params, tuple) or len(params) != 2:
+            raise TypeError(
+                "make requires exactly two type parameters: make[BaseType, ImplType]"
+            )
+        return _MakeMarker(params[0], params[1])
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        raise TypeError("make cannot be subclassed")
+
+    def __init__(self) -> None:
+        raise TypeError(
+            "make is not instantiable — use as a type annotation: make[BaseType, ImplType]"
+        )
+
+
+def is_make_type(annotation: Any) -> bool:
+    """Return True if *annotation* is a ``make[X, Y]`` marker."""
+    return isinstance(annotation, _MakeMarker)
+
+
+def unwrap_make(annotation: Any) -> Any:
+    """Unwrap ``make[X, Y]`` to ``X`` (base type).  Returns *annotation* unchanged otherwise."""
+    if isinstance(annotation, _MakeMarker):
+        return annotation.base_type
     return annotation
 
 
