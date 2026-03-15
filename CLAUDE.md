@@ -23,7 +23,7 @@ A code generator for dependency injection (DI) in Python based on the mediator a
 ### Testing
 - `uv run pytest` - Run tests without coverage (fast, for development)
 - `uv run pytest --cov` - Run tests with coverage and HTML/terminal/XML reports
-- `uv run pytest examples/` - Run testable examples (20 tests)
+- `uv run pytest examples/` - Run testable examples (46 tests)
 - `uv run pytest -m "not slow"` - Skip slow tests
 
 ### Code Quality
@@ -59,7 +59,7 @@ reactor-di-python/
 │   ├── test_pure_hasattr.py    # pure_hasattr utility tests (14 tests)
 │   ├── test_side_effects.py    # Side effects isolation tests
 │   └── test_thread_safe.py     # Thread-safe caching strategy tests (12 tests)
-├── examples/                   # Testable examples (39 tests, acts as test suite)
+├── examples/                   # Testable examples (46 tests, acts as test suite)
 │   ├── __init__.py             # Package initialization
 │   ├── quick_start.py          # Quick Start example as tests (4 tests)
 │   ├── quick_start_advanced.py # Advanced quick start example (4 tests)
@@ -68,7 +68,8 @@ reactor-di-python/
 │   ├── make_marker.py          # Subtype factory generation with make[Base, Impl] (7 tests)
 │   ├── nested_modules.py       # Nested modules and component-level lookup (10 tests)
 │   ├── side_effects.py         # Side effects testing (1 test)
-│   └── stacked_decorators.py   # Stacked decorators example (2 tests)
+│   ├── stacked_decorators.py   # Stacked decorators example (2 tests)
+│   └── testing.py              # Testing pattern: mock replacement on modules (7 tests)
 ├── .github/workflows/          # CI/CD pipelines
 │   ├── ci.yaml                 # Matrix testing across Python versions
 │   └── publish.yaml            # PyPI deployment
@@ -124,7 +125,7 @@ Simplified utilities that enable type-safe DI across both decorators:
 - **Matrix Testing**: Python 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
 - **Test Architecture**:
   - **Unit/Regression Tests**: Bug regression tests and utility tests in `tests/` (49 tests)
-  - **Example Tests**: Real-world usage patterns as executable tests in `examples/` (39 tests)
+  - **Example Tests**: Real-world usage patterns as executable tests in `examples/` (46 tests)
   - **Streamlined Configuration**: Minimal pytest configuration for essential functionality
 - **Test Quality**: Prioritize meaningful assertions over empty coverage metrics
 - **Realistic Testing**: Remove unrealistic defensive code rather than mock impossible scenarios

@@ -76,6 +76,7 @@ The `examples/` directory contains testable examples that demonstrate all the fe
 - **`stacked_decorators.py`** - Shows using multiple `@law_of_demeter` decorators on the same class
 - **`custom_prefix.py`** - Demonstrates custom prefix options (`prefix=''`, `prefix='cfg_'`, etc.)
 - **`side_effects.py`** - Tests side effect isolation during decoration
+- **`testing.py`** - Testing pattern: replacing module components with mocks
 
 ### Running Examples
 
@@ -362,14 +363,14 @@ This project uses modern Python tooling and best practices:
 ### Running Tests
 
 ```bash
-# Run all tests (88 tests: 39 examples + 49 regression/unit tests)
+# Run all tests (95 tests: 46 examples + 49 regression/unit tests)
 uv run pytest
 
 # Run tests with coverage and HTML/terminal reports
 uv run pytest --cov
 
 # Run example tests only
-uv run pytest examples/                     # Run all examples as tests (39 tests)
+uv run pytest examples/                     # Run all examples as tests (46 tests)
 uv run pytest examples/caching_strategy.py  # Caching strategy examples (5 tests)
 uv run pytest examples/custom_prefix.py     # Custom prefix examples (6 tests)
 uv run pytest examples/quick_start.py       # Quick start examples (4 tests)
