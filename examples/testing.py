@@ -16,8 +16,6 @@ Dependencies are resolved lazily: a component's ``__getattr__`` calls
 whatever is on the module at that point — real factory or mock.
 """
 
-from typing import cast
-
 from reactor_di import CachingStrategy, law_of_demeter, lookup, module
 
 # ---------------------------------------------------------------------------
@@ -231,8 +229,7 @@ def test_nested_module_mock():
     app.db = mock_db
 
     # child module's lookup[Database] resolves from parent.
-    # cast() narrows lookup[Database] to Database at the access site —
-    # the marker resolves to its inner type at runtime.
-    assert cast("Database", app.child.db) is mock_db
+    # ``lookup[T]`` erases to ``T`` for static analysis — no cast needed.
+    assert app.child.db is mock_db
     # component inside child module gets the mock too
     assert "nested-mock:" in app.child.user_repo.find(3)

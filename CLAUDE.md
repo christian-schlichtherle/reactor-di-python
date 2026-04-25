@@ -30,7 +30,7 @@ A code generator for dependency injection (DI) in Python based on the mediator a
 - `uv run ruff check src tests examples` - Run linting (style, imports, complexity, Python idioms)
 - `uv run black --check src tests examples` - Check code formatting
 - `uv run black src tests examples` - Format code  
-- `uv run mypy src examples` - Run static type checking (type safety, None checks, function signatures, plus the `assert_type` typing-regression assertions in `examples/typing_decorators_preserve_class_type.py`)
+- `uv run mypy src examples` - Run static type checking (type safety, None checks, function signatures, plus the `assert_type` typing-regression assertions in `examples/typing_decorators_preserve_class_type.py` and `examples/typing_lookup_make_erasure.py`)
 
 ### Building and Publishing
 - `uv build` - Build package for distribution
@@ -59,7 +59,7 @@ reactor-di-python/
 │   ├── test_pure_hasattr.py    # pure_hasattr utility tests (14 tests)
 │   ├── test_side_effects.py    # Side effects isolation tests
 │   └── test_thread_safe.py     # Thread-safe caching strategy tests (12 tests)
-├── examples/                   # Testable examples (50 tests, acts as test suite)
+├── examples/                   # Testable examples (53 tests, acts as test suite)
 │   ├── __init__.py             # Package initialization
 │   ├── quick_start.py          # Quick Start example as tests (4 tests)
 │   ├── quick_start_advanced.py # Advanced quick start example (4 tests)
@@ -70,7 +70,8 @@ reactor-di-python/
 │   ├── side_effects.py         # Side effects testing (1 test)
 │   ├── stacked_decorators.py   # Stacked decorators example (2 tests)
 │   ├── testing.py              # Testing pattern: mock replacement on modules (7 tests)
-│   └── typing_decorators_preserve_class_type.py # Mypy-checked demo: decorators preserve class type (4 tests)
+│   ├── typing_decorators_preserve_class_type.py # Mypy-checked demo: decorators preserve class type (4 tests)
+│   └── typing_lookup_make_erasure.py # Mypy-checked demo: lookup[T] / make[B, I] erase to T / B (3 tests)
 ├── .github/workflows/          # CI/CD pipelines
 │   ├── ci.yaml                 # Matrix testing across Python versions
 │   └── publish.yaml            # PyPI deployment
@@ -126,7 +127,7 @@ Simplified utilities that enable type-safe DI across both decorators:
 - **Matrix Testing**: Python 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
 - **Test Architecture**:
   - **Unit/Regression Tests**: Bug regression tests and utility tests in `tests/` (49 tests)
-  - **Example Tests**: Real-world usage patterns as executable tests in `examples/` (50 tests)
+  - **Example Tests**: Real-world usage patterns as executable tests in `examples/` (53 tests)
   - **Streamlined Configuration**: Minimal pytest configuration for essential functionality
 - **Test Quality**: Prioritize meaningful assertions over empty coverage metrics
 - **Realistic Testing**: Remove unrealistic defensive code rather than mock impossible scenarios
@@ -183,7 +184,16 @@ Simplified utilities that enable type-safe DI across both decorators:
 
 ## Recent Updates
 
-### Feature: `make` Annotation Marker (Latest)
+### Bug Fix: `lookup[T]` and `make[B, I]` Erase to Inner Type for Type Checkers (Latest)
+- Fixed regression introduced in 0.5.1 where `lookup` and `make` were declared as `Generic[_T]` / `Generic[_B, _I]` subclasses, which made attribute access statically typed as `lookup[T]` / `make[B, I]` instances rather than the inner types
+- Symptom: downstream consumers saw `"Class 'lookup' does not define '__add__'"`, `"Unresolved attribute reference 'restore' for class 'make'"`, etc., and were forced to use `cast()` at every access site
+- Fix: under `TYPE_CHECKING`, `lookup` and `make` are now generic type aliases declared via `typing_extensions.TypeAliasType` over `Annotated[_T, ...]` (analogous to how `Final[T]` / `ClassVar[T]` erase to `T` for static analyzers)
+- At runtime they remain marker classes whose `__class_getitem__` produces `_LookupMarker` / `_MakeMarker` instances consumed by `@module` / `@law_of_demeter` — no behavioral change
+- The two-arg form `lookup[T, "name"]` mixes a type and a string literal, which standard generic-alias subscript can't statically express; that form requires a localized `# type: ignore[type-arg]`
+- Added regression test `examples/typing_lookup_make_erasure.py` (3 tests + several `assert_type` static guards) covering `str` concatenation on `lookup[str]`, attribute access on `make[Base, Impl]`, and component-level `lookup` under `@law_of_demeter`
+- Removed `cast()` calls from `examples/make_marker.py`, `examples/nested_modules.py`, and `examples/testing.py` — they're no longer needed
+
+### Feature: `make` Annotation Marker
 - Added `make` annotation marker in `type_utils.py` for subtype factory generation
 - `make[BaseType, ImplType]` tells `@module` to generate a factory that instantiates `ImplType` instead of `BaseType`
 - Requires exactly two type parameters; raises `TypeError` otherwise

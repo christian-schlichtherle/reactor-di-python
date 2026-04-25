@@ -17,14 +17,20 @@ from __future__ import annotations
 
 import inspect
 import re
-from typing import Any, Final, Generic, TypeVar
+from typing import TYPE_CHECKING, Any, Final, TypeVar
 
 # Type variables for the ``lookup`` and ``make`` annotation markers.
-# These exist purely so static analyzers (mypy/IDEs) accept the
-# ``lookup[T]`` / ``make[B, I]`` subscripting syntax.  At runtime the
-# markers ignore the type arguments and return ``_LookupMarker`` /
-# ``_MakeMarker`` instances — see the docstrings for the static-vs-runtime
-# divergence and what it means for users.
+# These exist so that static analyzers (mypy/IDEs) accept the
+# ``lookup[T]`` / ``make[B, I]`` subscripting syntax *and* erase the
+# subscript to the inner type at attribute-access sites — i.e.
+# ``self.x: lookup[str]`` is statically seen as ``str`` (analogous to
+# how ``Final[T]`` and ``ClassVar[T]`` erase to ``T``).
+#
+# We achieve this by making ``lookup`` / ``make`` aliases for
+# ``Annotated[_T, ...]`` under ``TYPE_CHECKING`` (which type checkers
+# treat as the inner type after stripping the metadata) while keeping
+# the runtime classes whose ``__class_getitem__`` produces the marker
+# instances consumed by the ``@module`` / ``@law_of_demeter`` decorators.
 _T = TypeVar("_T")
 _B = TypeVar("_B")
 _I = TypeVar("_I")
@@ -56,75 +62,85 @@ class _LookupMarker:
         return f"lookup[{name}]"
 
 
-class lookup(Generic[_T]):
-    """Annotation marker for dependencies resolved from a parent module.
+if TYPE_CHECKING:
+    from typing import Annotated
 
-    Usage::
+    from typing_extensions import TypeAliasType
 
-        @module(CachingStrategy.NOT_THREAD_SAFE)
-        class ChildModule:
-            db: lookup[DatabaseConnection]              # lookup "db" on parent
-            conn: lookup[DatabaseConnection, "db"]      # lookup "db" on parent, bind to "conn"
-            service: MyService                          # created locally as usual
+    # ``lookup[T]`` aliases to ``Annotated[T, ...]`` for type checkers,
+    # which strip the metadata and treat the annotation as ``T`` at
+    # attribute-access sites.  This mirrors the static behavior of
+    # ``Final[T]`` and ``ClassVar[T]``: ``self.x: lookup[str]`` is seen as
+    # ``str`` by mypy/pyright/PyCharm.  Runtime semantics are unaffected —
+    # see the runtime ``lookup`` class below.
+    #
+    # ``TypeAliasType`` is used (rather than a bare ``Annotated[_T, ...]``)
+    # to declare ``lookup`` as a generic type alias parameterized over
+    # ``_T`` — this is what lets type checkers substitute ``T`` correctly
+    # when users write ``lookup[T]``.
+    lookup = TypeAliasType(
+        "lookup", Annotated[_T, "reactor_di.lookup"], type_params=(_T,)
+    )
+else:
 
-        @law_of_demeter("_config")
-        class MyComponent:
-            _config: Config
-            _timeout: int                               # forwarded from config
-            _db: lookup[DatabaseConnection]              # from parent module, NOT forwarded
+    class lookup:
+        """Annotation marker for dependencies resolved from a parent module.
 
-    The optional second parameter names the attribute to look up on the
-    parent module.  When omitted, the annotation's own name is used.
+        Usage::
 
-    On a **module**, ``@module`` skips factory generation and installs a
-    lightweight property so the name is visible to child-component factories.
-    The actual value is injected lazily by the parent module.
+            @module(CachingStrategy.NOT_THREAD_SAFE)
+            class ChildModule:
+                db: lookup[DatabaseConnection]              # lookup "db" on parent
+                conn: lookup[DatabaseConnection, "db"]      # lookup "db" on parent, bind to "conn"
+                service: MyService                          # created locally as usual
 
-    On a **component**, ``@law_of_demeter`` skips the attribute (does not
-    create a forwarding property for it).  The parent module's factory
-    resolves it through the standard dependency-map mechanism.  With
-    ``lookup[Type, "name"]``, the factory maps from the parent's ``name``
-    attribute to the component's local annotation name.
+            @law_of_demeter("_config")
+            class MyComponent:
+                _config: Config
+                _timeout: int                               # forwarded from config
+                _db: lookup[DatabaseConnection]              # from parent module, NOT forwarded
 
-    Static-vs-runtime divergence
-    ----------------------------
-    ``lookup`` is declared ``Generic[_T]`` purely so that mypy and IDEs
-    accept the ``lookup[Type]`` subscript syntax.  At **runtime** the
-    subscript returns an internal :class:`_LookupMarker` instance, not the
-    declared ``Type`` — the markers are consumed by the ``@module`` /
-    ``@law_of_demeter`` decorators which translate them into real factories
-    or forwarding properties on the decorated class.
+        The optional second parameter names the attribute to look up on the
+        parent module.  When omitted, the annotation's own name is used.
 
-    The implications for users are:
+        On a **module**, ``@module`` skips factory generation and installs a
+        lightweight property so the name is visible to child-component factories.
+        The actual value is injected lazily by the parent module.
 
-    * On a module attribute (``db: lookup[DatabaseConnection]``), the
-      decorator installs a real property that returns
-      ``DatabaseConnection`` at runtime — code accessing ``self.db`` works
-      naturally and is statically typed as ``lookup[DatabaseConnection]``;
-      narrow with :func:`typing.cast` if you need the resolved type.
-    * On a component attribute decorated by ``@law_of_demeter``, the marker
-      is also resolved into a real attribute; once the module wires it up,
-      ``self._db`` returns ``DatabaseConnection`` at runtime.
-    * The two-arg form ``lookup[Type, "name"]`` mixes a type and a string
-      literal, which generic classes can't statically express; that form
-      requires a localized ``# type: ignore[type-arg]``.
+        On a **component**, ``@law_of_demeter`` skips the attribute (does not
+        create a forwarding property for it).  The parent module's factory
+        resolves it through the standard dependency-map mechanism.  With
+        ``lookup[Type, "name"]``, the factory maps from the parent's ``name``
+        attribute to the component's local annotation name.
 
-    See ``examples/nested_modules.py`` for end-to-end usage including
-    ``cast()`` patterns at access sites.
-    """
+        Static-vs-runtime split
+        -----------------------
+        Under ``TYPE_CHECKING``, ``lookup`` is an alias for
+        ``Annotated[_T, ...]`` so that ``lookup[T]`` erases to ``T`` for
+        static analyzers — exactly the way ``Final[T]`` and ``ClassVar[T]``
+        do.  At **runtime**, ``lookup`` is this class, and ``lookup[T]``
+        invokes :meth:`__class_getitem__` to produce a :class:`_LookupMarker`
+        instance which the ``@module`` / ``@law_of_demeter`` decorators
+        consume to install real factories or forwarding properties on the
+        decorated class.
 
-    def __class_getitem__(cls, params: Any) -> _LookupMarker:
-        if isinstance(params, tuple):
-            return _LookupMarker(*params)
-        return _LookupMarker(params)
+        The two-arg form ``lookup[Type, "name"]`` mixes a type and a string
+        literal, which standard generic-alias subscript can't statically
+        express; that form requires a localized ``# type: ignore[type-arg]``.
+        """
 
-    def __init_subclass__(cls, **kwargs: Any) -> None:
-        raise TypeError("lookup cannot be subclassed")
+        def __class_getitem__(cls, params: Any) -> _LookupMarker:
+            if isinstance(params, tuple):
+                return _LookupMarker(*params)
+            return _LookupMarker(params)
 
-    def __init__(self) -> None:
-        raise TypeError(
-            "lookup is not instantiable — use as a type annotation: lookup[Type]"
-        )
+        def __init_subclass__(cls, **kwargs: Any) -> None:
+            raise TypeError("lookup cannot be subclassed")
+
+        def __init__(self) -> None:
+            raise TypeError(
+                "lookup is not instantiable — use as a type annotation: lookup[Type]"
+            )
 
 
 def is_lookup_type(annotation: Any) -> bool:
@@ -158,54 +174,69 @@ class _MakeMarker:
         return f"make[{base}, {impl}]"
 
 
-class make(Generic[_B, _I]):
-    """Annotation marker for subtype factory generation.
+if TYPE_CHECKING:
+    # ``make[Base, Impl]`` aliases to ``Annotated[Base, ..., Impl]`` for
+    # type checkers, which strip the metadata and treat the annotation as
+    # ``Base`` at attribute-access sites — analogous to ``Final[T]`` /
+    # ``ClassVar[T]``.  The ``Impl`` parameter is irrelevant for static
+    # typing (the runtime returns an ``Impl`` instance which IS-A ``Base``,
+    # so ``Base`` is the correct static type at access sites).
+    #
+    # ``TypeAliasType`` declares ``make`` as a generic type alias
+    # parameterized over both ``_B`` and ``_I``, which is what lets type
+    # checkers accept the two-argument subscript ``make[Base, Impl]``
+    # while still erasing it to ``Base``.
+    make = TypeAliasType(
+        "make",
+        Annotated[_B, "reactor_di.make", _I],
+        type_params=(_B, _I),
+    )
+else:
 
-    Usage::
+    class make:
+        """Annotation marker for subtype factory generation.
 
-        @module(CachingStrategy.NOT_THREAD_SAFE)
-        class AppModule:
-            service: make[ServiceBase, ServiceImpl]   # factory returns ServiceImpl()
+        Usage::
 
-    ``make[Foo, Bar]`` tells ``@module`` to generate a factory that
-    instantiates ``Bar`` (a subtype of ``Foo``).  The generated code is
-    equivalent to::
+            @module(CachingStrategy.NOT_THREAD_SAFE)
+            class AppModule:
+                service: make[ServiceBase, ServiceImpl]   # factory returns ServiceImpl()
 
-        @cached_property
-        def service(self) -> ServiceBase:
-            return ServiceImpl()
+        ``make[Foo, Bar]`` tells ``@module`` to generate a factory that
+        instantiates ``Bar`` (a subtype of ``Foo``).  The generated code is
+        equivalent to::
 
-    On a **component** with ``@law_of_demeter``, ``make[Foo, Bar]`` is
-    unwrapped to ``Foo`` for attribute resolution purposes.
+            @cached_property
+            def service(self) -> ServiceBase:
+                return ServiceImpl()
 
-    Static-vs-runtime divergence
-    ----------------------------
-    ``make`` is declared ``Generic[_B, _I]`` purely so that mypy and IDEs
-    accept the ``make[Base, Impl]`` subscript syntax.  At **runtime** the
-    subscript returns an internal :class:`_MakeMarker`, not the declared
-    types — the marker is consumed by the ``@module`` decorator, which
-    installs a real factory returning an ``Impl`` instance.
+        On a **component** with ``@law_of_demeter``, ``make[Foo, Bar]`` is
+        unwrapped to ``Foo`` for attribute resolution purposes.
 
-    The implication for users is that an attribute statically typed
-    ``make[Base, Impl]`` actually returns an ``Impl`` (which IS-A ``Base``)
-    at runtime; if you need to narrow to ``Impl`` for static analysis use
-    :func:`typing.cast`.  See ``examples/make_marker.py`` for usage.
-    """
+        Static-vs-runtime split
+        -----------------------
+        Under ``TYPE_CHECKING``, ``make`` is an alias for
+        ``Annotated[_B, ..., _I]`` so that ``make[Base, Impl]`` erases to
+        ``Base`` for static analyzers.  At **runtime**, ``make`` is this
+        class, and ``make[Base, Impl]`` invokes :meth:`__class_getitem__`
+        to produce a :class:`_MakeMarker` instance which the ``@module``
+        decorator consumes to install a real factory returning an ``Impl``.
+        """
 
-    def __class_getitem__(cls, params: Any) -> _MakeMarker:
-        if not isinstance(params, tuple) or len(params) != 2:
+        def __class_getitem__(cls, params: Any) -> _MakeMarker:
+            if not isinstance(params, tuple) or len(params) != 2:
+                raise TypeError(
+                    "make requires exactly two type parameters: make[BaseType, ImplType]"
+                )
+            return _MakeMarker(params[0], params[1])
+
+        def __init_subclass__(cls, **kwargs: Any) -> None:
+            raise TypeError("make cannot be subclassed")
+
+        def __init__(self) -> None:
             raise TypeError(
-                "make requires exactly two type parameters: make[BaseType, ImplType]"
+                "make is not instantiable — use as a type annotation: make[BaseType, ImplType]"
             )
-        return _MakeMarker(params[0], params[1])
-
-    def __init_subclass__(cls, **kwargs: Any) -> None:
-        raise TypeError("make cannot be subclassed")
-
-    def __init__(self) -> None:
-        raise TypeError(
-            "make is not instantiable — use as a type annotation: make[BaseType, ImplType]"
-        )
 
 
 def is_make_type(annotation: Any) -> bool:

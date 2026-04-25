@@ -78,6 +78,7 @@ The `examples/` directory contains testable examples that demonstrate all the fe
 - **`side_effects.py`** - Tests side effect isolation during decoration
 - **`testing.py`** - Testing pattern: replacing module components with mocks
 - **`typing_decorators_preserve_class_type.py`** - Demonstrates (and statically asserts via `mypy`) that `@law_of_demeter` and `@module` preserve the input class type
+- **`typing_lookup_make_erasure.py`** - Demonstrates (and statically asserts via `mypy`) that `lookup[T]` and `make[B, I]` erase to `T` / `B` for type checkers, so attribute access type-checks without `cast()`
 
 ### Running Examples
 
@@ -219,7 +220,9 @@ class AuditModule:
     connection: lookup[DatabaseConnection, "db"]  # look up "db" on parent, bind as "connection"
 ```
 
-On a component (non-module class), `lookup` is a no-op — the type is unwrapped and dependency resolution proceeds normally.
+On a component (non-module class), `@law_of_demeter` skips `lookup`-annotated attributes — the parent module's factory resolves them through the dependency-map mechanism instead of forwarding from the base reference.
+
+`lookup[T]` and `make[B, I]` erase to `T` / `B` at type-check time (mirroring how `Final[T]` and `ClassVar[T]` erase to `T`), so attribute access works naturally in IDEs and `mypy` without `cast()`.
 
 ### Custom Prefixes
 
@@ -364,14 +367,14 @@ This project uses modern Python tooling and best practices:
 ### Running Tests
 
 ```bash
-# Run all tests (99 tests: 50 examples + 49 regression/unit tests)
+# Run all tests (102 tests: 53 examples + 49 regression/unit tests)
 uv run pytest
 
 # Run tests with coverage and HTML/terminal reports
 uv run pytest --cov
 
 # Run example tests only
-uv run pytest examples/                     # Run all examples as tests (50 tests)
+uv run pytest examples/                     # Run all examples as tests (53 tests)
 uv run pytest examples/caching_strategy.py  # Caching strategy examples (5 tests)
 uv run pytest examples/custom_prefix.py     # Custom prefix examples (6 tests)
 uv run pytest examples/quick_start.py       # Quick start examples (4 tests)
