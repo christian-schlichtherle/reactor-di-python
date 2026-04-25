@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import threading
 from functools import cached_property
-from typing import Any, Callable, get_type_hints
+from typing import Any, Callable, TypeVar, get_type_hints, overload
 
 from .caching import CachingStrategy, thread_safe_cached_property
 from .type_utils import (
@@ -23,6 +23,8 @@ from .type_utils import (
     pure_hasattr,
     resolve_abstract_property_conflicts,
 )
+
+_C = TypeVar("_C", bound=type)
 
 
 def _module_getattr(self: Any, name: str) -> Any:
@@ -172,9 +174,7 @@ def _create_factory_method(
     raise ValueError(f"Unsupported caching strategy: {caching_strategy}")
 
 
-def _apply_module_decorator(
-    class_type: type[Any], caching_strategy: CachingStrategy
-) -> type[Any]:
+def _apply_module_decorator(class_type: _C, caching_strategy: CachingStrategy) -> _C:
     """Apply the module decorator to a class.
 
     Processes all type-annotated attributes and creates factory methods for
@@ -238,6 +238,16 @@ def _apply_module_decorator(
             factory_method.__set_name__(class_type, attr_name)
 
     return class_type
+
+
+@overload
+def module(class_or_strategy: _C, /) -> _C: ...
+
+
+@overload
+def module(
+    class_or_strategy: CachingStrategy | None = ..., /
+) -> Callable[[_C], _C]: ...
 
 
 def module(

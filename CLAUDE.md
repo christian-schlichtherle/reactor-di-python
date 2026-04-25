@@ -30,7 +30,7 @@ A code generator for dependency injection (DI) in Python based on the mediator a
 - `uv run ruff check src tests examples` - Run linting (style, imports, complexity, Python idioms)
 - `uv run black --check src tests examples` - Check code formatting
 - `uv run black src tests examples` - Format code  
-- `uv run mypy src` - Run static type checking (type safety, None checks, function signatures)
+- `uv run mypy src tests/test_typing_decorator_preserves_type.py` - Run static type checking (type safety, None checks, function signatures, plus typing-regression assertions)
 
 ### Building and Publishing
 - `uv build` - Build package for distribution
@@ -152,7 +152,7 @@ Simplified utilities that enable type-safe DI across both decorators:
 
 1. Make changes in `src/reactor_di/`
 2. Add/update tests in `tests/` and examples in `examples/`
-3. Run quality checks: `uv run pytest --cov && uv run ruff check src tests examples && uv run black --check src tests examples && uv run mypy src`
+3. Run quality checks: `uv run pytest --cov && uv run ruff check src tests examples && uv run black --check src tests examples && uv run mypy src tests/test_typing_decorator_preserves_type.py`
 4. Update documentation if needed
 5. Commit and push (CI will validate)
 

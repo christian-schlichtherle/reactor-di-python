@@ -397,7 +397,7 @@ uv run ruff check src tests examples
 uv run black --check src tests examples
 
 # Run type checking
-uv run mypy src
+uv run mypy src tests/test_typing_decorator_preserves_type.py
 
 # Fix formatting
 uv run black src tests examples
