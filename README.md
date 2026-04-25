@@ -77,6 +77,7 @@ The `examples/` directory contains testable examples that demonstrate all the fe
 - **`custom_prefix.py`** - Demonstrates custom prefix options (`prefix=''`, `prefix='cfg_'`, etc.)
 - **`side_effects.py`** - Tests side effect isolation during decoration
 - **`testing.py`** - Testing pattern: replacing module components with mocks
+- **`typing_decorators_preserve_class_type.py`** - Demonstrates (and statically asserts via `mypy`) that `@law_of_demeter` and `@module` preserve the input class type
 
 ### Running Examples
 
@@ -363,14 +364,14 @@ This project uses modern Python tooling and best practices:
 ### Running Tests
 
 ```bash
-# Run all tests (95 tests: 46 examples + 49 regression/unit tests)
+# Run all tests (99 tests: 50 examples + 49 regression/unit tests)
 uv run pytest
 
 # Run tests with coverage and HTML/terminal reports
 uv run pytest --cov
 
 # Run example tests only
-uv run pytest examples/                     # Run all examples as tests (46 tests)
+uv run pytest examples/                     # Run all examples as tests (50 tests)
 uv run pytest examples/caching_strategy.py  # Caching strategy examples (5 tests)
 uv run pytest examples/custom_prefix.py     # Custom prefix examples (6 tests)
 uv run pytest examples/quick_start.py       # Quick start examples (4 tests)
@@ -397,7 +398,7 @@ uv run ruff check src tests examples
 uv run black --check src tests examples
 
 # Run type checking
-uv run mypy src tests/test_typing_decorator_preserves_type.py
+uv run mypy src examples
 
 # Fix formatting
 uv run black src tests examples

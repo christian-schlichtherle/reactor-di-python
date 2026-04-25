@@ -17,6 +17,8 @@ An optional second parameter renames the lookup::
     conn: lookup[DatabaseConnection, "db"]   # look up "db" on parent, bind as "conn"
 """
 
+from typing import cast
+
 from reactor_di import CachingStrategy, law_of_demeter, lookup, module
 
 # ---------------------------------------------------------------------------
@@ -122,8 +124,9 @@ def test_child_module_receives_parent_dependency():
     """The child module's lookup dependency is the same instance as the parent's."""
     app = AppModule()
 
-    assert app.user_module.db is app.db
-    assert app.order_module.db is app.db
+    # cast() narrows lookup[T] to T — the marker resolves to its inner type at runtime.
+    assert cast("DatabaseConnection", app.user_module.db) is app.db
+    assert cast("DatabaseConnection", app.order_module.db) is app.db
 
 
 def test_child_components_use_shared_dependency():
@@ -209,8 +212,9 @@ def test_deeply_nested_lookup():
     """Lookup chains through multiple levels of nesting."""
     root = RootModule()
 
-    assert root.middle_module.db is root.db
-    assert root.middle_module.cache_module.db is root.db
+    # lookup[T] resolves to T at runtime — cast() narrows for static analysis.
+    assert cast("DatabaseConnection", root.middle_module.db) is root.db
+    assert cast("DatabaseConnection", root.middle_module.cache_module.db) is root.db
     assert root.middle_module.cache_module.cache_config.ttl == 300
 
 
@@ -226,7 +230,10 @@ class AuditModule:
     The parent provides ``db``, but this module binds it as ``connection``.
     """
 
-    connection: lookup[DatabaseConnection, "db"]  # noqa: F821  # look up "db" on parent
+    # The two-arg form ``lookup[Type, "name"]`` mixes a type and a string
+    # literal — generic classes can't statically express this, so we
+    # localise ``# type: ignore[type-arg, name-defined]`` here.
+    connection: lookup[DatabaseConnection, "db"]  # type: ignore[type-arg,name-defined] # noqa: F821
 
 
 @module(CachingStrategy.NOT_THREAD_SAFE)
@@ -239,7 +246,8 @@ def test_renamed_lookup():
     """lookup[Type, "name"] resolves the parent's attribute under a different local name."""
     app = AppModuleWithRename()
 
-    assert app.audit_module.connection is app.db
+    # lookup[T, "name"] resolves to T at runtime.
+    assert cast("DatabaseConnection", app.audit_module.connection) is app.db
 
 
 @law_of_demeter("_connection")
@@ -257,7 +265,8 @@ class AuditService:
 class AuditModuleWithComponent:
     """Renamed lookup feeding into a local component."""
 
-    connection: lookup[DatabaseConnection, "db"]  # noqa: F821
+    # See note above on the two-arg form requiring ``type: ignore``.
+    connection: lookup[DatabaseConnection, "db"]  # type: ignore[type-arg,name-defined] # noqa: F821
     audit_service: AuditService
 
 
@@ -303,7 +312,9 @@ class ServiceWithComponentLookup:
         pass
 
     def do_work(self) -> str:
-        return self._db.query(f"timeout={self._timeout}")
+        # cast() narrows lookup[T] to T at the access site —
+        # the marker resolves to its inner type at runtime.
+        return cast("DatabaseConnection", self._db).query(f"timeout={self._timeout}")
 
 
 @module(CachingStrategy.NOT_THREAD_SAFE)
@@ -317,9 +328,10 @@ def test_component_lookup_skips_law_of_demeter_forwarding():
     """lookup on a component prevents @law_of_demeter from forwarding it."""
     m = ComponentLookupModule()
 
-    # _db comes from the module (DatabaseConnection), NOT from config.db (string)
+    # _db comes from the module (DatabaseConnection), NOT from config.db (string).
+    # cast() narrows lookup[T] to T at the access site.
     assert isinstance(m.service._db, DatabaseConnection)
-    assert m.service._db is m.db
+    assert cast("DatabaseConnection", m.service._db) is m.db
     # _timeout is still forwarded from config
     assert m.service._timeout == 30
 
@@ -331,9 +343,10 @@ def test_component_lookup_with_rename():
     class ServiceWithRenamedLookup:
         _config: Config
         _timeout: int  # forwarded from config
-        _conn: lookup[
-            DatabaseConnection, "db"  # noqa: F821
-        ]  # "db" on parent, bound as "_conn"
+        # The two-arg form ``lookup[Type, "name"]`` mixes a type and a string
+        # literal — generic classes can't statically express this, so we
+        # localise ``# type: ignore[type-arg, name-defined]`` here.
+        _conn: lookup[DatabaseConnection, "db"]  # type: ignore[type-arg,name-defined] # noqa: F821 — "db" on parent, bound as "_conn"
 
         def __init__(self) -> None:
             pass
@@ -346,7 +359,8 @@ def test_component_lookup_with_rename():
 
     m = RenamedLookupModule()
 
-    assert m.service._conn is m.db
+    # lookup[T, "name"] resolves to T at runtime.
+    assert cast("DatabaseConnection", m.service._conn) is m.db
     assert m.service._timeout == 30
 
 
@@ -356,4 +370,5 @@ def test_component_lookup_end_to_end():
 
     result = m.service.do_work()
     assert "timeout=30" in result
-    assert m.service._db.connected is True
+    # lookup[T] resolves to T at runtime — cast() narrows for static analysis.
+    assert cast("DatabaseConnection", m.service._db).connected is True

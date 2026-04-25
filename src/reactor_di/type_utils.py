@@ -17,7 +17,17 @@ from __future__ import annotations
 
 import inspect
 import re
-from typing import Any, Final
+from typing import Any, Final, Generic, TypeVar
+
+# Type variables for the ``lookup`` and ``make`` annotation markers.
+# These exist purely so static analyzers (mypy/IDEs) accept the
+# ``lookup[T]`` / ``make[B, I]`` subscripting syntax.  At runtime the
+# markers ignore the type arguments and return ``_LookupMarker`` /
+# ``_MakeMarker`` instances — see the docstrings for the static-vs-runtime
+# divergence and what it means for users.
+_T = TypeVar("_T")
+_B = TypeVar("_B")
+_I = TypeVar("_I")
 
 # Constants for internal attribute names
 SETUP_DEPENDENCIES_ATTR: Final[str] = "_reactor_di_setup_dependencies"
@@ -46,7 +56,7 @@ class _LookupMarker:
         return f"lookup[{name}]"
 
 
-class lookup:
+class lookup(Generic[_T]):
     """Annotation marker for dependencies resolved from a parent module.
 
     Usage::
@@ -75,6 +85,32 @@ class lookup:
     resolves it through the standard dependency-map mechanism.  With
     ``lookup[Type, "name"]``, the factory maps from the parent's ``name``
     attribute to the component's local annotation name.
+
+    Static-vs-runtime divergence
+    ----------------------------
+    ``lookup`` is declared ``Generic[_T]`` purely so that mypy and IDEs
+    accept the ``lookup[Type]`` subscript syntax.  At **runtime** the
+    subscript returns an internal :class:`_LookupMarker` instance, not the
+    declared ``Type`` — the markers are consumed by the ``@module`` /
+    ``@law_of_demeter`` decorators which translate them into real factories
+    or forwarding properties on the decorated class.
+
+    The implications for users are:
+
+    * On a module attribute (``db: lookup[DatabaseConnection]``), the
+      decorator installs a real property that returns
+      ``DatabaseConnection`` at runtime — code accessing ``self.db`` works
+      naturally and is statically typed as ``lookup[DatabaseConnection]``;
+      narrow with :func:`typing.cast` if you need the resolved type.
+    * On a component attribute decorated by ``@law_of_demeter``, the marker
+      is also resolved into a real attribute; once the module wires it up,
+      ``self._db`` returns ``DatabaseConnection`` at runtime.
+    * The two-arg form ``lookup[Type, "name"]`` mixes a type and a string
+      literal, which generic classes can't statically express; that form
+      requires a localized ``# type: ignore[type-arg]``.
+
+    See ``examples/nested_modules.py`` for end-to-end usage including
+    ``cast()`` patterns at access sites.
     """
 
     def __class_getitem__(cls, params: Any) -> _LookupMarker:
@@ -122,7 +158,7 @@ class _MakeMarker:
         return f"make[{base}, {impl}]"
 
 
-class make:
+class make(Generic[_B, _I]):
     """Annotation marker for subtype factory generation.
 
     Usage::
@@ -141,6 +177,19 @@ class make:
 
     On a **component** with ``@law_of_demeter``, ``make[Foo, Bar]`` is
     unwrapped to ``Foo`` for attribute resolution purposes.
+
+    Static-vs-runtime divergence
+    ----------------------------
+    ``make`` is declared ``Generic[_B, _I]`` purely so that mypy and IDEs
+    accept the ``make[Base, Impl]`` subscript syntax.  At **runtime** the
+    subscript returns an internal :class:`_MakeMarker`, not the declared
+    types — the marker is consumed by the ``@module`` decorator, which
+    installs a real factory returning an ``Impl`` instance.
+
+    The implication for users is that an attribute statically typed
+    ``make[Base, Impl]`` actually returns an ``Impl`` (which IS-A ``Base``)
+    at runtime; if you need to narrow to ``Impl`` for static analysis use
+    :func:`typing.cast`.  See ``examples/make_marker.py`` for usage.
     """
 
     def __class_getitem__(cls, params: Any) -> _MakeMarker:

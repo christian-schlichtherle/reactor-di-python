@@ -17,7 +17,7 @@ This is useful for:
 """
 
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Optional, cast
 
 from reactor_di import CachingStrategy, law_of_demeter, make, module
 
@@ -160,8 +160,11 @@ def test_make_with_law_of_demeter_forwarding():
     """@law_of_demeter forwarding works on the impl type."""
     m = ServiceModule()
 
-    assert m.service._retry_count == 3
-    assert m.service._base_url == "https://api.example.com"
+    # cast() narrows make[B, I] to I at the access site —
+    # the marker resolves to its impl type at runtime.
+    service = cast("HttpService", m.service)
+    assert service._retry_count == 3
+    assert service._base_url == "https://api.example.com"
 
 
 # ---------------------------------------------------------------------------

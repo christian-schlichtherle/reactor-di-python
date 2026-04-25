@@ -114,7 +114,7 @@ def test_thread_safe_concurrent_access():
 
     CountingService._instance_count = 0
     ts_module = CountingModule()
-    results: list = []
+    results: list[CountingService] = []
     barrier = threading.Barrier(10)
 
     def access_service() -> None:

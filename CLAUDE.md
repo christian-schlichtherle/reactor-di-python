@@ -30,7 +30,7 @@ A code generator for dependency injection (DI) in Python based on the mediator a
 - `uv run ruff check src tests examples` - Run linting (style, imports, complexity, Python idioms)
 - `uv run black --check src tests examples` - Check code formatting
 - `uv run black src tests examples` - Format code  
-- `uv run mypy src tests/test_typing_decorator_preserves_type.py` - Run static type checking (type safety, None checks, function signatures, plus typing-regression assertions)
+- `uv run mypy src examples` - Run static type checking (type safety, None checks, function signatures, plus the `assert_type` typing-regression assertions in `examples/typing_decorators_preserve_class_type.py`)
 
 ### Building and Publishing
 - `uv build` - Build package for distribution
@@ -59,7 +59,7 @@ reactor-di-python/
 │   ├── test_pure_hasattr.py    # pure_hasattr utility tests (14 tests)
 │   ├── test_side_effects.py    # Side effects isolation tests
 │   └── test_thread_safe.py     # Thread-safe caching strategy tests (12 tests)
-├── examples/                   # Testable examples (46 tests, acts as test suite)
+├── examples/                   # Testable examples (50 tests, acts as test suite)
 │   ├── __init__.py             # Package initialization
 │   ├── quick_start.py          # Quick Start example as tests (4 tests)
 │   ├── quick_start_advanced.py # Advanced quick start example (4 tests)
@@ -69,7 +69,8 @@ reactor-di-python/
 │   ├── nested_modules.py       # Nested modules and component-level lookup (10 tests)
 │   ├── side_effects.py         # Side effects testing (1 test)
 │   ├── stacked_decorators.py   # Stacked decorators example (2 tests)
-│   └── testing.py              # Testing pattern: mock replacement on modules (7 tests)
+│   ├── testing.py              # Testing pattern: mock replacement on modules (7 tests)
+│   └── typing_decorators_preserve_class_type.py # Mypy-checked demo: decorators preserve class type (4 tests)
 ├── .github/workflows/          # CI/CD pipelines
 │   ├── ci.yaml                 # Matrix testing across Python versions
 │   └── publish.yaml            # PyPI deployment
@@ -125,7 +126,7 @@ Simplified utilities that enable type-safe DI across both decorators:
 - **Matrix Testing**: Python 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
 - **Test Architecture**:
   - **Unit/Regression Tests**: Bug regression tests and utility tests in `tests/` (49 tests)
-  - **Example Tests**: Real-world usage patterns as executable tests in `examples/` (46 tests)
+  - **Example Tests**: Real-world usage patterns as executable tests in `examples/` (50 tests)
   - **Streamlined Configuration**: Minimal pytest configuration for essential functionality
 - **Test Quality**: Prioritize meaningful assertions over empty coverage metrics
 - **Realistic Testing**: Remove unrealistic defensive code rather than mock impossible scenarios
@@ -152,7 +153,7 @@ Simplified utilities that enable type-safe DI across both decorators:
 
 1. Make changes in `src/reactor_di/`
 2. Add/update tests in `tests/` and examples in `examples/`
-3. Run quality checks: `uv run pytest --cov && uv run ruff check src tests examples && uv run black --check src tests examples && uv run mypy src tests/test_typing_decorator_preserves_type.py`
+3. Run quality checks: `uv run pytest --cov && uv run ruff check src tests examples && uv run black --check src tests examples && uv run mypy src examples`
 4. Update documentation if needed
 5. Commit and push (CI will validate)
 

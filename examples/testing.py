@@ -16,6 +16,8 @@ Dependencies are resolved lazily: a component's ``__getattr__`` calls
 whatever is on the module at that point — real factory or mock.
 """
 
+from typing import cast
+
 from reactor_di import CachingStrategy, law_of_demeter, lookup, module
 
 # ---------------------------------------------------------------------------
@@ -93,7 +95,7 @@ def test_replace_single_component():
 
     # Mock only the database
     mock_db = Database()
-    mock_db.query = lambda sql: f"mock-result: {sql}"  # type: ignore[assignment]
+    mock_db.query = lambda sql: f"mock-result: {sql}"  # type: ignore[method-assign]
     app.db = mock_db
 
     # user_repo picks up the mock database via DI
@@ -116,7 +118,7 @@ def test_replace_multiple_components():
     app.config = mock_config
 
     mock_db = Database()
-    mock_db.query = lambda sql: f"test-db: {sql}"  # type: ignore[assignment]
+    mock_db.query = lambda sql: f"test-db: {sql}"  # type: ignore[method-assign]
     app.db = mock_db
 
     # api client gets mock config
@@ -132,7 +134,7 @@ def test_partial_mock_real_config():
 
     mock_db = Database()
     mock_db.connected = False
-    mock_db.query = lambda sql: "connection-refused"  # type: ignore[assignment]
+    mock_db.query = lambda sql: "connection-refused"  # type: ignore[method-assign]
     app.db = mock_db
 
     # Real config flows through to real API client
@@ -170,7 +172,7 @@ def test_cached_component_picks_up_later_mock():
 
     # Now mock the database AFTER the component was created
     mock_db = Database()
-    mock_db.query = lambda sql: f"late-mock: {sql}"  # type: ignore[assignment]
+    mock_db.query = lambda sql: f"late-mock: {sql}"  # type: ignore[method-assign]
     app.db = mock_db
 
     # user_repo._db hasn't been accessed yet, so __getattr__ resolves it now
@@ -195,7 +197,7 @@ def test_thread_safe_module_mock():
     app = ThreadSafeModule()
 
     mock_db = Database()
-    mock_db.query = lambda sql: f"ts-mock: {sql}"  # type: ignore[assignment]
+    mock_db.query = lambda sql: f"ts-mock: {sql}"  # type: ignore[method-assign]
     app.db = mock_db
 
     assert "ts-mock:" in app.user_repo.find(99)
@@ -225,10 +227,12 @@ def test_nested_module_mock():
     app = ParentModule()
 
     mock_db = Database()
-    mock_db.query = lambda sql: f"nested-mock: {sql}"  # type: ignore[assignment]
+    mock_db.query = lambda sql: f"nested-mock: {sql}"  # type: ignore[method-assign]
     app.db = mock_db
 
-    # child module's lookup[Database] resolves from parent
-    assert app.child.db is mock_db
+    # child module's lookup[Database] resolves from parent.
+    # cast() narrows lookup[Database] to Database at the access site —
+    # the marker resolves to its inner type at runtime.
+    assert cast("Database", app.child.db) is mock_db
     # component inside child module gets the mock too
     assert "nested-mock:" in app.child.user_repo.find(3)

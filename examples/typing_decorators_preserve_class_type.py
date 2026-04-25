@@ -1,16 +1,21 @@
-"""Static-typing regression test: decorators must preserve the input class type.
+"""Example: ``@law_of_demeter`` and ``@module`` preserve the input class type.
 
-This file is intentionally minimal at runtime — its real purpose is to be
-checked by ``mypy``.  If ``law_of_demeter`` or ``module`` regress to a
-``Callable[[type[Any]], type[Any]]`` signature (which erases the input
-class type), the ``assert_type`` calls below will fail static type
-checking, even though the runtime ``test_*`` function will still pass.
+This example demonstrates — and statically verifies — that both decorators
+return the *same* concrete class type they were given, rather than widening
+to ``type[Any]``.  Preserving the class type is what allows IDEs, mypy, and
+downstream code to keep seeing the original class with all its attributes
+after decoration.
 
-The runtime ``test_*`` functions exist so that pytest does not warn about
-the file containing only declarations.
+The static guarantees are expressed via :func:`typing_extensions.assert_type`
+calls below.  They are evaluated by ``mypy`` (wired into CI via
+``uv run mypy src examples``) — if either decorator ever regresses to a
+``Callable[[type[Any]], type[Any]]``-style signature, those assertions will
+fail static type checking even though the runtime sanity tests below would
+still pass.
 
-Mypy is wired to check this file via the project's mypy invocation (see
-``CLAUDE.md`` / CI config).
+The runtime ``test_*`` functions are idiomatic for the ``examples/`` directory
+(every example file is also collected by pytest) and double as a basic sanity
+check that the decorators return the original class object at runtime.
 """
 
 from __future__ import annotations
