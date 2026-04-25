@@ -47,6 +47,17 @@ class _LookupMarker:
 
     Stores the inner type and an optional *source_name* override so that
     decorators can detect, unwrap, and remap the dependency.
+
+    The class is callable (``__call__`` raises) purely so that
+    ``typing._type_check`` accepts an instance as a "valid" annotation
+    value when ``get_type_hints`` evaluates a stringified ``lookup[T]``
+    annotation under ``from __future__ import annotations`` on Python
+    3.9 / 3.10.  Those versions of ``_type_check`` accept any ``callable``
+    as a fallthrough; without ``__call__`` they raise ``TypeError:
+    Forward references must evaluate to types.``  Python 3.11+ relaxed
+    this check.  The ``_apply_module_decorator`` annotation walker never
+    invokes the marker — it detects markers via :func:`is_lookup_type`
+    and unwraps them via :func:`unwrap_lookup`.
     """
 
     __slots__ = ("inner_type", "source_name")
@@ -60,6 +71,15 @@ class _LookupMarker:
         if self.source_name is not None:
             return f'lookup[{name}, "{self.source_name}"]'
         return f"lookup[{name}]"
+
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        # See class docstring — this exists only to satisfy
+        # ``typing._type_check`` on Python 3.9 / 3.10.  No call site in
+        # this codebase invokes a marker.
+        raise TypeError(
+            "lookup markers are not callable — they are annotation values "
+            "consumed by the @module / @law_of_demeter decorators"
+        )
 
 
 if TYPE_CHECKING:
@@ -160,6 +180,9 @@ class _MakeMarker:
 
     Stores the base type (used for the property return annotation) and
     the implementation type (actually instantiated by the factory).
+
+    See :class:`_LookupMarker` for the rationale behind ``__call__``
+    (Python 3.9 / 3.10 ``typing._type_check`` compatibility).
     """
 
     __slots__ = ("base_type", "impl_type")
@@ -172,6 +195,12 @@ class _MakeMarker:
         base = getattr(self.base_type, "__name__", repr(self.base_type))
         impl = getattr(self.impl_type, "__name__", repr(self.impl_type))
         return f"make[{base}, {impl}]"
+
+    def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        raise TypeError(
+            "make markers are not callable — they are annotation values "
+            "consumed by the @module decorator"
+        )
 
 
 if TYPE_CHECKING:
