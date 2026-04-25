@@ -67,6 +67,7 @@ exclude_lines = [
     "class .*\\bProtocol\\):",
     "def __repr__",
     "if 0:",
+    "if TYPE_CHECKING:",
     "if __name__ == .__main__.:",
     "if self.debug:",
     "if settings.DEBUG",
