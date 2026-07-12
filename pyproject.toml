@@ -30,7 +30,7 @@ classifiers = [
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = []
-description = "A code generator for dependency injection (DI) in Python which is based on the mediator and factory patterns"
+description = "A code generator for dependency injection (DI) in Python which is based on the mediator and factory patterns."
 dynamic = ["version"]
 keywords = ["code-generation", "dependency-injection", "di", "factory", "mediator"]
 license = { text = "MIT" }
