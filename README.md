@@ -20,7 +20,7 @@ A code generator for dependency injection (DI) in Python which is based on the m
 - **TYPE_CHECKING compatible**: Works with `if TYPE_CHECKING:` imports for circular dependency avoidance
 - **Pydantic compatible**: Works with Pydantic BaseSettings/BaseModel annotation-only fields
 - **ABC compatible**: Automatic resolution of abstract `@property` conflicts with DI annotations
-- **Python 3.9+ support**: Tested on Python 3.9 through 3.14
+- **Python 3.9+ support**: Tested on Python 3.9 through 3.15
 
 ## Installation
 
@@ -94,14 +94,15 @@ All examples are automatically tested as part of the CI pipeline to ensure they 
 
 ## Tests
 
-The `tests/` directory contains regression and unit tests (49 tests):
+The `tests/` directory contains regression and unit tests (63 tests):
 
 - **`test_module_integration.py`** - Module + law_of_demeter integration with annotation-only configs, Pydantic compatibility, and abstract property conflict resolution
 - **`test_lazy_resolution.py`** - Lazy per-attribute resolution with deferred initialization patterns
 - **`test_forward_ref.py`** - TYPE_CHECKING forward reference handling in module factory
 - **`test_dataclass_law_of_demeter.py`** - Dataclass + stacked @law_of_demeter regression tests (3 tests)
-- **`test_pure_hasattr.py`** - Comprehensive tests for the `pure_hasattr` utility (14 tests)
+- **`test_pure_hasattr.py`** - Comprehensive tests for the `pure_hasattr` utility (15 tests)
 - **`test_thread_safe.py`** - Thread-safe caching strategy with concurrent access tests (12 tests)
+- **`test_type_utils_markers.py`** - Runtime invariants of the `lookup` / `make` markers, e.g. that they are callable for `typing._type_check` (14 tests)
 - **`test_law_of_demeter.py`** - Law of Demeter decorator tests
 - **`test_side_effects.py`** - Side effects isolation during decoration
 
@@ -367,7 +368,7 @@ This project uses modern Python tooling and best practices:
 ### Running Tests
 
 ```bash
-# Run all tests (102 tests: 53 examples + 49 regression/unit tests)
+# Run all tests (116 tests: 53 examples + 63 regression/unit tests)
 uv run pytest
 
 # Run tests with coverage and HTML/terminal reports
@@ -380,7 +381,7 @@ uv run pytest examples/custom_prefix.py     # Custom prefix examples (6 tests)
 uv run pytest examples/quick_start.py       # Quick start examples (4 tests)
 
 # Run regression/unit tests only
-uv run pytest tests/                        # Run all regression tests (49 tests)
+uv run pytest tests/                        # Run all regression tests (63 tests)
 ```
 
 ### Debugging in PyCharm

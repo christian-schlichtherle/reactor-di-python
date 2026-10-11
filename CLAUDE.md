@@ -23,7 +23,7 @@ A code generator for dependency injection (DI) in Python based on the mediator a
 ### Testing
 - `uv run pytest` - Run tests without coverage (fast, for development)
 - `uv run pytest --cov` - Run tests with coverage and HTML/terminal/XML reports
-- `uv run pytest examples/` - Run testable examples (46 tests)
+- `uv run pytest examples/` - Run testable examples (53 tests)
 - `uv run pytest -m "not slow"` - Skip slow tests
 
 ### Code Quality
@@ -47,7 +47,7 @@ reactor-di-python/
 │   ├── caching.py              # CachingStrategy enum and thread_safe_cached_property descriptor
 │   ├── type_utils.py           # Shared type checking utilities
 │   └── py.typed                # Type marker for mypy
-├── tests/                      # Regression and unit tests (49 tests)
+├── tests/                      # Regression and unit tests (63 tests)
 │   ├── __init__.py             # Package initialization
 │   ├── config.py               # Test config fixture
 │   ├── database.py             # Test database fixture
@@ -56,9 +56,10 @@ reactor-di-python/
 │   ├── test_law_of_demeter.py  # Law of Demeter decorator tests
 │   ├── test_lazy_resolution.py # Lazy per-attribute resolution with deferred init
 │   ├── test_module_integration.py # Module + law_of_demeter integration tests
-│   ├── test_pure_hasattr.py    # pure_hasattr utility tests (14 tests)
+│   ├── test_pure_hasattr.py    # pure_hasattr utility tests (15 tests)
 │   ├── test_side_effects.py    # Side effects isolation tests
-│   └── test_thread_safe.py     # Thread-safe caching strategy tests (12 tests)
+│   ├── test_thread_safe.py     # Thread-safe caching strategy tests (12 tests)
+│   └── test_type_utils_markers.py # lookup / make runtime marker invariants (14 tests)
 ├── examples/                   # Testable examples (53 tests, acts as test suite)
 │   ├── __init__.py             # Package initialization
 │   ├── quick_start.py          # Quick Start example as tests (4 tests)
@@ -73,8 +74,9 @@ reactor-di-python/
 │   ├── typing_decorators_preserve_class_type.py # Mypy-checked demo: decorators preserve class type (4 tests)
 │   └── typing_lookup_make_erasure.py # Mypy-checked demo: lookup[T] / make[B, I] erase to T / B (3 tests)
 ├── .github/workflows/          # CI/CD pipelines
-│   ├── ci.yaml                 # Matrix testing across Python versions
-│   └── publish.yaml            # PyPI deployment
+│   ├── ci.yaml                 # Runs the test workflow on pushes and PRs
+│   ├── publish.yaml            # PyPI deployment
+│   └── test.yaml               # Reusable test workflow with the Python version matrix
 └── pyproject.toml             # Modern Python configuration
 ```
 
@@ -124,9 +126,9 @@ Simplified utilities that enable type-safe DI across both decorators:
 
 - **Coverage Achievement**: 90% test coverage requirement (focused on realistic scenarios)
 - **Framework**: pytest with pytest-cov
-- **Matrix Testing**: Python 3.9, 3.10, 3.11, 3.12, 3.13, 3.14
+- **Matrix Testing**: Python 3.9, 3.10, 3.11, 3.12, 3.13, 3.14, 3.15
 - **Test Architecture**:
-  - **Unit/Regression Tests**: Bug regression tests and utility tests in `tests/` (49 tests)
+  - **Unit/Regression Tests**: Bug regression tests and utility tests in `tests/` (63 tests)
   - **Example Tests**: Real-world usage patterns as executable tests in `examples/` (53 tests)
   - **Streamlined Configuration**: Minimal pytest configuration for essential functionality
 - **Test Quality**: Prioritize meaningful assertions over empty coverage metrics
